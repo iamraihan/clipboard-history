@@ -1,0 +1,46 @@
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = [
+  # Remove after 2026-11-25 by upgrading rusqlite to 0.42 (sqlcipher-src >= 420).
+  { id = "RUSTSEC-2026-0502", reason = "exploiting it needs write access to the user's own app-data dir; fix needs rusqlite 0.42 (sqlcipher-src >=420), under 2 weeks old until 2026-11-25" },
+  # Unmaintained proc-macro crate pulled in by Tauri's GTK3 bindings on Linux
+  # (glib-macros). Compile-time only; no fix until Tauri moves off GTK3.
+  { id = "RUSTSEC-2024-0370", reason = "build-time only, via tauri -> gtk3-rs" },
+  # zbus 5.x split crates, merged into zbus 6 and flagged "unmaintained" (no vulnerability).
+  # Pulled in on Linux by tauri-plugin-single-instance 2.5.4 (D-Bus single-instance lock).
+  # Remove when the plugin moves to zbus 6. Review these (and the =2.5.4 pin)
+  # when upgrading tauri-plugin-single-instance past 2.5.4.
+  { id = "RUSTSEC-2026-0370", reason = "unmaintained zvariant (merged into zbus 6), via tauri-plugin-single-instance -> zbus 5" },
+  { id = "RUSTSEC-2026-0371", reason = "unmaintained zbus_names (merged into zbus 6), via tauri-plugin-single-instance -> zbus 5" },
+  { id = "RUSTSEC-2026-0372", reason = "unmaintained zvariant_derive (merged into zbus 6), via tauri-plugin-single-instance -> zbus 5" },
+]
+
+[licenses]
+version = 2
+allow = [
+  "MIT",
+  "Apache-2.0",
+  # target-lexicon, build-time via Tauri's system-deps
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "MPL-2.0",
+]
+
+# SQLite and WTFPL notices ship inside sqlcipher-src only.
+[[licenses.exceptions]]
+crate = "sqlcipher-src"
+allow = ["blessing", "WTFPL"]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

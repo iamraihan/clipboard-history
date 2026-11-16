@@ -1,0 +1,86 @@
+# Quick sanity gate for every push / PR: the frontend builds and the Rust
+# backend type-checks and passes its unit tests on all three platforms.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev libgtk-3-dev libxcb1-dev libxcb-xfixes0-dev libxcb-xtest0-dev xvfb
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Audit npm production dependencies
+        run: pnpm audit --prod
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: Audit Rust dependencies (advisories, licenses, sources)
+        run: cargo deny --manifest-path src-tauri/Cargo.toml check
+
+      - name: Build frontend (tsc + vite)
+        run: pnpm build
+
+      - name: Type-check Rust backend
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      # Regenerate the ts-rs bindings from scratch so a deleted or renamed
+      # Rust type shows up as a deleted file in the check below.
+      - name: Clear generated TypeScript bindings
+        if: runner.os == 'Linux'
+        run: rm -rf src/lib/bindings
+
+      # Run from src-tauri/ so cargo picks up src-tauri/.cargo/config.toml
+      # (it tells ts-rs where to write the TypeScript bindings).
+      - name: Rust unit tests
+        if: runner.os != 'Linux'
+        working-directory: src-tauri
+        run: cargo test --locked
+
+      # xvfb gives the Linux backends a display to talk to.
+      - name: Rust unit tests (Linux, under Xvfb)
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        run: xvfb-run -a cargo test --locked
+
+      # `cargo test` regenerates src/lib/bindings from the Rust DTOs (ts-rs).
+      # Any diff means someone changed a Rust type without committing the
+      # regenerated TypeScript.
+      - name: TypeScript bindings are up to date
+        if: runner.os == 'Linux'
+        run: |
+          # Fails on any modified, deleted or untracked file under bindings
+          if [ -n "$(git status --porcelain -- src/lib/bindings)" ]; then
+            git status --porcelain -- src/lib/bindings
+            exit 1
+          fi

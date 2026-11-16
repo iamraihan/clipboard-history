@@ -1,0 +1,64 @@
+[package]
+name = "clipboard-history"
+version = "0.1.0"
+description = "Cross-platform clipboard history"
+authors = ["Raihan Ali"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+# The `_lib` suffix is necessary for the lib name to be unique on Windows,
+# see https://github.com/rust-lang/cargo/issues/8519
+name = "clipboard_history_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dev-dependencies]
+tempfile = "3.27.0"
+# Generates src/lib/bindings/*.ts from the IPC types during `cargo test`.
+ts-rs = { version = "11", features = ["serde-compat"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+blake3 = "1.8.7"
+rusqlite = { version = "0.41.1", features = ["bundled-sqlcipher-vendored-openssl"] }
+image = { version = "0.25.10", default-features = false, features = ["png"] }
+hex = "0.4.3"
+chrono = { version = "0.4.45", default-features = false, features = ["std"] }
+base64 = "0.23.1"
+# OS CSPRNG for the database key; already in the tree via other crates.
+getrandom = "0.3.4"
+# Global shortcut on X11 / macOS / Windows (Rust side only, no JS).
+tauri-plugin-global-shortcut = "2.4.1"
+# Second launch (the GNOME keybinding runs `<app> --toggle`) forwards to the running app.
+# 2.5.4, not 2.5.5: 2.5.5 is under 2 weeks old (published 2026-10-28).
+tauri-plugin-single-instance = "=2.5.4"
+
+# keyring 3.x, not 4.x: 4.x replaced the feature set (no sync-secret-service /
+# crypto-rust / apple-native / windows-native) and splits stores into keyring-core.
+# One platform store per OS.
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"] }
+# X11 / XWayland clipboard backend. Pure-Rust connection; `allow-unsafe-code` stays off.
+x11rb = { version = "0.14.0", features = ["xfixes", "xtest"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3.6.3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3.6.3", features = ["windows-native"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
