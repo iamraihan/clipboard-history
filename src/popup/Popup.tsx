@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { ClipboardList, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorText, ipc } from "../lib/ipc";
 import type { ClipSummary, StartupReport } from "../lib/types";
@@ -10,9 +11,24 @@ const SEARCH_DEBOUNCE_MS = 80;
 const MODIFIER_KEYS = new Set(["Control", "Shift", "Alt", "Meta"]);
 const CLEAR_CONFIRM_MS = 3000;
 const NO_PLAIN_TEXT = "This item has no plain text";
-const KEYS_HINT = "Enter paste · Shift+Enter plain · Ctrl+P pin · Del delete · Esc close";
+// Footer key legend. Pin and delete keys are named on the row buttons' tooltips.
+const KEYS: readonly (readonly [string, string])[] = [
+  ["Enter", "Paste"],
+  ["Shift+Enter", "Plain text"],
+  ["Esc", "Close"],
+];
 // Where the app cannot paste for you (Wayland), picking only copies.
-const COPY_ONLY_HINT = "Pick an item, then press Ctrl+V · Ctrl+P pin · Del delete · Esc close";
+const COPY_ONLY_KEYS: readonly (readonly [string, string])[] = [
+  ["Enter", "Copy"],
+  ["Ctrl+V", "Paste it"],
+  ["Esc", "Close"],
+];
+
+function Kbd({ children }: { children: string }) {
+  return (
+    <kbd className="rounded border border-line bg-bg px-1 py-px font-sans text-[11px] leading-4 text-fg">{children}</kbd>
+  );
+}
 
 interface Banner {
   text: string;
@@ -184,7 +200,8 @@ export default function Popup() {
           {n.text}
         </p>
       ))}
-      <div className="border-b border-line p-2">
+      <div className="relative border-b border-line p-2">
+        <Search aria-hidden className="pointer-events-none absolute top-1/2 left-4.5 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
         <input
           ref={inputRef}
           autoFocus
@@ -203,8 +220,16 @@ export default function Popup() {
             setQuery(e.target.value);
           }}
           onKeyDown={onInputKeyDown}
-          className="h-8 w-full rounded-md border border-line bg-bg px-2.5 text-fg outline-none placeholder:text-muted focus:border-accent"
+          className={`h-8 w-full rounded-md border border-line bg-bg pl-8 text-fg outline-none placeholder:text-muted focus:border-accent ${report?.shortcut ? "pr-[72px]" : "pr-2.5"}`}
         />
+        {report?.shortcut ? (
+          <span
+            title={`${report.shortcut} opens this window from any app`}
+            className="absolute top-1/2 right-[18px] -translate-y-1/2 opacity-80"
+          >
+            <Kbd>{report.shortcut}</Kbd>
+          </span>
+        ) : null}
       </div>
       <div
         id="clip-list"
@@ -213,12 +238,21 @@ export default function Popup() {
         className="min-h-0 flex-1 overflow-y-auto py-1"
       >
         {empty ? (
-          <p className="px-3 py-8 text-center text-muted">
-            {query.trim() !== "" ? "No matches" : "Nothing copied yet"}
-            {query.trim() === "" && report?.shortcut ? (
-              <span className="mt-1 block text-xs">Copy something, then press {report.shortcut} to open this list.</span>
-            ) : null}
-          </p>
+          <div className="flex flex-col items-center px-6 pt-14 text-center">
+            {query.trim() === "" ? (
+              <>
+                <ClipboardList aria-hidden className="mb-3 h-7 w-7 text-muted" strokeWidth={1.5} />
+                <p className="font-medium text-fg">Nothing copied yet</p>
+                <p className="mt-1 text-xs text-muted">
+                  {report?.shortcut
+                    ? `Copy something, then press ${report.shortcut} to open this list.`
+                    : "Copy something and it will appear here."}
+                </p>
+              </>
+            ) : (
+              <p className="text-muted">No matches for “{query.trim()}”</p>
+            )}
+          </div>
         ) : (
           clips.map((c, i) => (
             <ClipRow
@@ -233,18 +267,16 @@ export default function Popup() {
           ))
         )}
       </div>
-      <footer className="flex items-center gap-2 border-t border-line px-3 py-1.5 text-xs text-muted">
-        <span className="min-w-0 flex-1 truncate" aria-live="polite">
-          {hint ?? (report && !report.autoPasteAvailable ? COPY_ONLY_HINT : KEYS_HINT)}
+      <footer className="flex h-8 items-center gap-2 border-t border-line pr-1.5 pl-3 text-xs text-muted">
+        <span className="flex min-w-0 flex-1 items-center gap-3 truncate" aria-live="polite">
+          {hint ??
+            (report && !report.autoPasteAvailable ? COPY_ONLY_KEYS : KEYS).map(([key, action]) => (
+              <span key={key} className="flex shrink-0 items-center gap-1">
+                <Kbd>{key}</Kbd>
+                {action}
+              </span>
+            ))}
         </span>
-        {report?.shortcut ? (
-          <kbd
-            title={`${report.shortcut} opens this window from any app`}
-            className="shrink-0 rounded border border-line px-1.5 py-0.5 font-sans text-fg"
-          >
-            {report.shortcut}
-          </kbd>
-        ) : null}
         <button
           type="button"
           tabIndex={-1}
@@ -252,7 +284,8 @@ export default function Popup() {
             clearUnpinned();
             inputRef.current?.focus();
           }}
-          className={`shrink-0 rounded px-1.5 py-0.5 hover:bg-hover hover:text-fg ${confirmClear ? "text-fg" : ""}`}
+          title="Clear unpinned items (Ctrl+Shift+Del)"
+          className={`shrink-0 rounded px-1.5 py-0.5 ${confirmClear ? "bg-warn-bg text-warn-fg" : "hover:bg-hover hover:text-fg"}`}
         >
           <span aria-live="polite">{confirmClear ? "Click again to clear unpinned" : "Clear"}</span>
         </button>

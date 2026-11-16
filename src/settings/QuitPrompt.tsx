@@ -36,6 +36,7 @@ export default function QuitPrompt() {
         </>
       }
     >
+      <p className="mt-2 text-muted">Giving it back restores the shortcut GNOME had before.</p>
       {error && (
         <p role="alert" className="mt-3 rounded-md bg-warn-bg px-3 py-1.5 text-xs text-warn-fg">
           {error}

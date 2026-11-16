@@ -28,7 +28,7 @@ export function ClipRow({ clip, selected, onPick, onTogglePin, onDelete, onHover
       data-selected={selected}
       onClick={onPick}
       onMouseMove={onHover}
-      className="group relative mx-1 flex h-9 cursor-default items-center gap-2 rounded-md px-2 data-[selected=true]:bg-selected data-[selected=true]:outline-2 data-[selected=true]:-outline-offset-2 data-[selected=true]:outline-accent"
+      className="group relative mx-1.5 flex h-9 cursor-default items-center gap-2.5 rounded-md px-2 data-[selected=true]:bg-selected"
     >
       {clip.thumbnailPngBase64 ? (
         <img
@@ -37,15 +37,22 @@ export function ClipRow({ clip, selected, onPick, onTogglePin, onDelete, onHover
           className="h-7 w-7 shrink-0 rounded-sm object-cover"
         />
       ) : (
-        <Icon aria-hidden className="h-4 w-4 shrink-0 text-muted" />
+        <span className="grid h-7 w-7 shrink-0 place-items-center">
+          <Icon aria-hidden className="h-4 w-4 text-muted" />
+        </span>
       )}
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {clip.pinned && <Pin aria-label="Pinned" className="h-3.5 w-3.5 shrink-0 fill-accent text-accent" />}
+      {clip.pinned && (
+        <Pin
+          aria-label="Pinned"
+          className="h-3.5 w-3.5 shrink-0 fill-accent text-accent group-hover:hidden group-data-[selected=true]:hidden"
+        />
+      )}
       <span className="hidden shrink-0 items-center gap-0.5 group-data-[selected=true]:flex group-hover:flex">
-        <RowButton label={clip.pinned ? "Unpin" : "Pin"} onClick={onTogglePin}>
-          <Pin className="h-3.5 w-3.5" />
+        <RowButton label={clip.pinned ? "Unpin (Ctrl+P)" : "Pin (Ctrl+P)"} onClick={onTogglePin}>
+          <Pin className={`h-3.5 w-3.5 ${clip.pinned ? "fill-accent text-accent" : ""}`} />
         </RowButton>
-        <RowButton label="Delete" onClick={onDelete}>
+        <RowButton label="Delete (Del)" onClick={onDelete}>
           <Trash2 className="h-3.5 w-3.5" />
         </RowButton>
       </span>
