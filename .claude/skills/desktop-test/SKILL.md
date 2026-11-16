@@ -42,6 +42,7 @@ Shortcut (record gsettings state first)
 11. Tray "Reset shortcuts to default": `toggle-message-tray` is `['<Super>v', '<Super>m']` again, the custom list no longer has `clipboard-history/`.
 11b. After "Not now" the tray status says "Shortcut not set: choose “Use Super+V…”" and the menu has "Use Super+V…", which reopens the first-run dialog. If another binding also had Super+V, the dialog then says "Super+V was also removed from: …" with OK.
 12. To retry first run: quit, set `firstRunDone` to false in `settings.json`, restart. With Force on, tray "Quit" asks "Give Super+V back to GNOME before quitting?" (three buttons).
+12b. Start at login (release build: the `.deb` or AppImage). First start creates `~/.config/autostart/Clipboard History.desktop` (exact name from `ls ~/.config/autostart`) with `Exec=... --autostart`; the tray shows "Start at login" checked and `settings.json` has `autostartDefaultApplied: true`. Log out and in: the app is in the tray, no popup. Uncheck it: the entry is gone and stays gone after a restart. `pnpm tauri dev` never creates the entry by itself.
 13. Wayland only: ADR 0001 "Still to confirm" (real login, native apps, on-demand Xwayland).
 
 ## Reset everything

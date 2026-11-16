@@ -28,7 +28,8 @@ Same conventions as `prayer-times`: Rust is the single source of truth for IPC t
 | `commands` | Tauri commands the frontend calls. |
 | `tray` | Tray icon and menu. |
 | `updater` | Update check against GitHub Releases (`latest.json`) on launch, daily and from the tray's "Check for updates", the app's only network access; offers the update as a tray line. Release builds only. See `RELEASING.md`. |
-| `popup` | Popup window lifecycle: show, position, hide on blur. |
+| `popup` | Popup window lifecycle: show, position, take focus, hide on blur. |
+| `autostart` | Start at login (`tauri-plugin-autostart`): on by default once, toggled from the tray; the login entry passes `--autostart`, so the app starts in the tray. |
 
 Frontend (`src/`): one page serves both windows; `App.tsx` picks the view from the window label (`popup` or `settings`). Both windows are created hidden at startup.
 

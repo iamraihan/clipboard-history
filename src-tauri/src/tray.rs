@@ -1,13 +1,13 @@
 //! System tray icon and menu.
 //!
 //! Menu: the update line (while a newer release exists or installs), "Open clipboard history (<shortcut>)", "Use Super+V…" (GNOME, only while no shortcut
-//! is set), "Reset shortcuts to default", the update line when there is no
+//! is set), "Reset shortcuts to default", "Start at login" (a check item), the update line when there is no
 //! newer release ("Check for updates", "Up to date…"), "Quit". The
 //! tooltip carries the shortcut and startup problems. Tauri ignores tooltips on
 //! Linux, so when there is a problem the menu starts with it as disabled lines.
 
 use crate::shortcut;
-use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::AppHandle;
 
@@ -17,6 +17,7 @@ const USE_SUPER_V: &str = "use-super-v";
 const RESET: &str = "reset";
 const QUIT: &str = "quit";
 const UPDATE: &str = "update";
+const START_AT_LOGIN: &str = "start-at-login";
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let text = shortcut::current_tooltip(app);
@@ -38,6 +39,8 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         items.push(Box::new(MenuItem::with_id(app, USE_SUPER_V, "Use Super+V\u{2026}", true, None::<&str>)?));
     }
     items.push(Box::new(MenuItem::with_id(app, RESET, "Reset shortcuts to default", true, None::<&str>)?));
+    let at_login = crate::autostart::is_enabled(app);
+    items.push(Box::new(CheckMenuItem::with_id(app, START_AT_LOGIN, "Start at login", true, at_login, None::<&str>)?));
     if !update.top {
         items.push(Box::new(MenuItem::with_id(app, UPDATE, &update.label, update.enabled, None::<&str>)?));
     }
@@ -64,6 +67,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             }
             QUIT => shortcut::request_quit(app),
             UPDATE => crate::updater::on_click(app),
+            START_AT_LOGIN => crate::autostart::toggle(app),
             _ => {}
         });
     if let Some(icon) = app.default_window_icon() {

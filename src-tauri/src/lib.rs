@@ -1,3 +1,4 @@
+mod autostart;
 mod commands;
 pub mod core;
 pub mod engine;
@@ -207,8 +208,14 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         // First, so a second launch never gets as far as opening the store.
         // A second launch, with or without `--toggle`, opens (toggles) the popup.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| popup::toggle(app)))
-        .plugin(tauri_plugin_updater::Builder::new().build());
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // A second login entry while the app already runs changes nothing.
+            if core::autostart::launch_kind(&argv) != core::autostart::Launch::Autostart {
+                popup::toggle(app);
+            }
+        }))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(autostart::plugin());
     if shortcut::uses_plugin() {
         builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
     }
@@ -220,9 +227,10 @@ pub fn run() {
             // Before the tray: the tray menu reads the update state.
             updater::start(app.handle());
             tray::build(app.handle())?;
-            let toggled = std::env::args().any(|a| a == shortcut::TOGGLE_ARG);
-            if toggled || shortcut::opens_popup_at_launch(plan) {
-                // First launch from the shortcut or the app grid: let the popup page load, then open it.
+            autostart::init(app.handle());
+            let launch = core::autostart::launch_kind(&std::env::args().collect::<Vec<_>>());
+            if shortcut::opens_popup_at_launch(plan, launch) {
+                // First launch from the shortcut or the app grid (not login): let the popup page load, then open it.
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(400));

@@ -19,8 +19,6 @@ use ts_rs::TS;
 pub const SETTINGS_WINDOW: &str = "settings";
 /// Emitted with the new `SettingsView` when the settings window is shown for a purpose.
 const SETTINGS_VIEW_CHANGED: &str = "settings-view-changed";
-/// Passed by the GNOME keybinding (and any launcher) to toggle the popup.
-pub const TOGGLE_ARG: &str = "--toggle";
 
 /// How the global shortcut gets registered in this session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,11 +107,17 @@ pub fn startup_plan(kind: RegistrarKind, settings: &Settings) -> StartupPlan {
     }
 }
 
-/// A launch without `--toggle` (the app grid, a terminal) opens the popup so
-/// the user sees the app and its shortcut, except while the first-run dialog
-/// asks about Super+V.
-pub fn opens_popup_at_launch(plan: StartupPlan) -> bool {
-    plan != StartupPlan::AskFirstRun
+/// Whether starting the app opens the popup. The shortcut always does. A
+/// plain launch (the app grid, a terminal) does too, so the user sees the app
+/// and its shortcut, except while the first-run dialog asks about Super+V.
+/// Login never does: the app starts in the tray.
+pub fn opens_popup_at_launch(plan: StartupPlan, launch: crate::core::autostart::Launch) -> bool {
+    use crate::core::autostart::Launch;
+    match launch {
+        Launch::Toggle => true,
+        Launch::Plain => plan != StartupPlan::AskFirstRun,
+        Launch::Autostart => false,
+    }
 }
 
 /// The shortcut to show the user (`combo` from Settings), only while it works.
@@ -763,10 +767,20 @@ mod tests {
 
     #[test]
     fn a_plain_launch_opens_the_popup_unless_the_first_run_dialog_is_up() {
-        assert!(opens_popup_at_launch(StartupPlan::Register));
-        assert!(opens_popup_at_launch(StartupPlan::Idle));
-        assert!(opens_popup_at_launch(StartupPlan::Restore));
-        assert!(!opens_popup_at_launch(StartupPlan::AskFirstRun));
+        use crate::core::autostart::Launch;
+        assert!(opens_popup_at_launch(StartupPlan::Register, Launch::Plain));
+        assert!(opens_popup_at_launch(StartupPlan::Idle, Launch::Plain));
+        assert!(opens_popup_at_launch(StartupPlan::Restore, Launch::Plain));
+        assert!(!opens_popup_at_launch(StartupPlan::AskFirstRun, Launch::Plain));
+    }
+
+    #[test]
+    fn the_shortcut_always_opens_the_popup_and_login_never_does() {
+        use crate::core::autostart::Launch;
+        assert!(opens_popup_at_launch(StartupPlan::Register, Launch::Toggle));
+        assert!(opens_popup_at_launch(StartupPlan::AskFirstRun, Launch::Toggle));
+        assert!(!opens_popup_at_launch(StartupPlan::Register, Launch::Autostart));
+        assert!(!opens_popup_at_launch(StartupPlan::Idle, Launch::Autostart));
     }
 
     #[test]

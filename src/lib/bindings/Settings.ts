@@ -2,4 +2,9 @@
 import type { Limits } from "./Limits";
 import type { SavedBinding } from "./SavedBinding";
 
-export type Settings = { limits: Limits, paused: boolean, excludedApps: Array<string>, shortcut: string, forceSuperV: boolean, autoPaste: boolean, firstRunDone: boolean, savedBindings: Array<SavedBinding>, };
+export type Settings = { limits: Limits, paused: boolean, excludedApps: Array<string>, shortcut: string, forceSuperV: boolean, autoPaste: boolean, firstRunDone: boolean, savedBindings: Array<SavedBinding>, 
+/**
+ * Start at login was turned on once (its default); from then on the OS
+ * entry itself is the user's choice.
+ */
+autostartDefaultApplied: boolean, };

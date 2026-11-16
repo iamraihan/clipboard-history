@@ -34,6 +34,9 @@ pub struct Settings {
     pub auto_paste: bool,
     pub first_run_done: bool,
     pub saved_bindings: Vec<SavedBinding>,
+    /// Start at login was turned on once (its default); from then on the OS
+    /// entry itself is the user's choice.
+    pub autostart_default_applied: bool,
 }
 
 impl Default for Settings {
@@ -47,6 +50,7 @@ impl Default for Settings {
             auto_paste: true,
             first_run_done: false,
             saved_bindings: Vec::new(),
+            autostart_default_applied: false,
         }
     }
 }
@@ -92,6 +96,7 @@ fn from_value(value: Value) -> Settings {
         auto_paste: field(&map, "autoPaste", d.auto_paste),
         first_run_done: field(&map, "firstRunDone", d.first_run_done),
         saved_bindings: field(&map, "savedBindings", d.saved_bindings),
+        autostart_default_applied: field(&map, "autostartDefaultApplied", d.autostart_default_applied),
     }
 }
 
@@ -142,6 +147,7 @@ mod tests {
         assert_eq!(s.limits.max_items, 100);
         assert_eq!(s.shortcut, "Super+V");
         assert!(s.auto_paste && !s.force_super_v && !s.paused);
+        assert!(!s.autostart_default_applied);
         std::fs::remove_dir_all(p.parent().unwrap()).unwrap();
     }
 
@@ -189,6 +195,7 @@ mod tests {
             auto_paste: false,
             first_run_done: true,
             saved_bindings: vec![SavedBinding { schema: "org.gnome.a".into(), key: "k".into(), original: "['<Super>v']".into() }],
+            autostart_default_applied: true,
         };
         save(&p, &s).unwrap();
         assert!(!p.with_extension("tmp").exists());
