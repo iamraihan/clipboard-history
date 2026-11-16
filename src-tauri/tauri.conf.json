@@ -48,7 +48,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_CONTENTS_OF_clipboard-history.key.pub",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgxRUQ0QzREQjkzMEE0QjcKUldTM3BEQzVUVXp0Z2ZkK1VKam11S0dqMjdIL0ZkQVhuanNGRHl0Ri80TlF5Tkk0citoWEpnQVoK",
       "endpoints": [
         "https://github.com/iamraihan/clipboard-history/releases/latest/download/latest.json"
       ]
