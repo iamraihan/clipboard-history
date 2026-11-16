@@ -27,7 +27,7 @@ Same conventions as `prayer-times`: Rust is the single source of truth for IPC t
 | `engine` | Receives ClipEvents, applies `core` decisions, runs side effects (store, clipboard, windows, tray). |
 | `commands` | Tauri commands the frontend calls. |
 | `tray` | Tray icon and menu. |
-| `updater` | Update check against GitHub Releases (`latest.json`) on launch and daily, the app's only network access; offers the update as a tray line. Release builds only. See `RELEASING.md`. |
+| `updater` | Update check against GitHub Releases (`latest.json`) on launch, daily and from the tray's "Check for updates", the app's only network access; offers the update as a tray line. Release builds only. See `RELEASING.md`. |
 | `popup` | Popup window lifecycle: show, position, hide on blur. |
 
 Frontend (`src/`): one page serves both windows; `App.tsx` picks the view from the window label (`popup` or `settings`). Both windows are created hidden at startup.

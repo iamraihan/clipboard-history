@@ -1,8 +1,11 @@
 //! App updates from GitHub Releases: the app's only network access. Checks on
-//! launch and once a day; a newer release shows up as a tray menu line. The
-//! decisions (which line, when to check) live in `core::update`.
+//! launch and once a day, and when the user clicks the tray's update line. A
+//! newer release shows up at the top of the tray menu. The decisions (which
+//! line, when to check) live in `core::update`.
 
-use crate::core::update::{should_check, tray_item, TrayUpdateItem, UpdateMethod, UpdateStatus};
+use crate::core::update::{
+    after_failed_check, click_action, should_check, tray_item, ClickAction, TrayUpdateItem, UpdateMethod, UpdateStatus,
+};
 use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
@@ -31,7 +34,8 @@ fn lock(app: &AppHandle) -> MutexGuard<'_, Inner> {
     app.state::<UpdateState>().inner().0.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Starts the periodic check. Debug builds (`pnpm tauri dev`) never check.
+/// Starts the periodic check. Debug builds (`pnpm tauri dev`) only check when
+/// the user clicks the tray line.
 pub fn start(app: &AppHandle) {
     app.manage(UpdateState::default());
     if cfg!(debug_assertions) {
@@ -54,8 +58,16 @@ async fn check(app: &AppHandle) {
     };
     let found = match found {
         Ok(found) => found,
-        // Offline or GitHub unreachable: keep what we had, try again tomorrow.
-        Err(e) => return eprintln!("update check: {e}"),
+        // Offline or GitHub unreachable: try again tomorrow, and tell the
+        // user only if they asked for this check.
+        Err(e) => {
+            eprintln!("update check: {e}");
+            let mut inner = lock(app);
+            inner.status = after_failed_check(&inner.status);
+            drop(inner);
+            crate::tray::refresh(app);
+            return;
+        }
     };
     {
         let mut inner = lock(app);
@@ -72,17 +84,28 @@ async fn check(app: &AppHandle) {
     crate::tray::refresh(app);
 }
 
-/// The tray line for the update, if any.
-pub fn current_tray_item(app: &AppHandle) -> Option<TrayUpdateItem> {
-    tray_item(&lock(app).status, METHOD)
+/// The tray line for updates.
+pub fn current_tray_item(app: &AppHandle) -> TrayUpdateItem {
+    tray_item(&lock(app).status, METHOD, &app.package_info().version.to_string())
 }
 
 /// The tray line was clicked.
 pub fn on_click(app: &AppHandle) {
-    match METHOD {
-        UpdateMethod::ReleasePage => open_release_page(),
-        UpdateMethod::InPlace => install(app),
+    let action = click_action(&lock(app).status);
+    match (action, METHOD) {
+        (ClickAction::Install, UpdateMethod::ReleasePage) => open_release_page(),
+        (ClickAction::Install, UpdateMethod::InPlace) => install(app),
+        (ClickAction::Check, _) => check_now(app),
+        (ClickAction::Nothing, _) => {}
     }
+}
+
+/// A check the user asked for: the tray says "Checking…" until it ends.
+fn check_now(app: &AppHandle) {
+    lock(app).status = UpdateStatus::Checking;
+    crate::tray::refresh(app);
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move { check(&app).await });
 }
 
 fn install(app: &AppHandle) {

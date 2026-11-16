@@ -1,7 +1,8 @@
 //! System tray icon and menu.
 //!
-//! Menu: the update line (only when a newer release exists), "Open clipboard history (<shortcut>)", "Use Super+V…" (GNOME, only while no shortcut
-//! is set), "Reset shortcuts to default", "Quit". The
+//! Menu: the update line (while a newer release exists or installs), "Open clipboard history (<shortcut>)", "Use Super+V…" (GNOME, only while no shortcut
+//! is set), "Reset shortcuts to default", the update line when there is no
+//! newer release ("Check for updates", "Up to date…"), "Quit". The
 //! tooltip carries the shortcut and startup problems. Tauri ignores tooltips on
 //! Linux, so when there is a problem the menu starts with it as disabled lines.
 
@@ -27,8 +28,9 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     if !problems.is_empty() {
         items.push(Box::new(PredefinedMenuItem::separator(app)?));
     }
-    if let Some(update) = crate::updater::current_tray_item(app) {
-        items.push(Box::new(MenuItem::with_id(app, UPDATE, update.label, update.enabled, None::<&str>)?));
+    let update = crate::updater::current_tray_item(app);
+    if update.top {
+        items.push(Box::new(MenuItem::with_id(app, UPDATE, &update.label, update.enabled, None::<&str>)?));
         items.push(Box::new(PredefinedMenuItem::separator(app)?));
     }
     items.push(Box::new(MenuItem::with_id(app, OPEN, shortcut::open_label(shortcut::current_shortcut(app).as_deref()), true, None::<&str>)?));
@@ -36,6 +38,9 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         items.push(Box::new(MenuItem::with_id(app, USE_SUPER_V, "Use Super+V\u{2026}", true, None::<&str>)?));
     }
     items.push(Box::new(MenuItem::with_id(app, RESET, "Reset shortcuts to default", true, None::<&str>)?));
+    if !update.top {
+        items.push(Box::new(MenuItem::with_id(app, UPDATE, &update.label, update.enabled, None::<&str>)?));
+    }
     items.push(Box::new(MenuItem::with_id(app, QUIT, "Quit", true, None::<&str>)?));
     let refs: Vec<&dyn IsMenuItem<tauri::Wry>> = items.iter().map(|i| i.as_ref()).collect();
     Menu::with_items(app, &refs)
