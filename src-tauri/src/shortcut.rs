@@ -109,6 +109,26 @@ pub fn startup_plan(kind: RegistrarKind, settings: &Settings) -> StartupPlan {
     }
 }
 
+/// A launch without `--toggle` (the app grid, a terminal) opens the popup so
+/// the user sees the app and its shortcut, except while the first-run dialog
+/// asks about Super+V.
+pub fn opens_popup_at_launch(plan: StartupPlan) -> bool {
+    plan != StartupPlan::AskFirstRun
+}
+
+/// The shortcut to show the user (`combo` from Settings), only while it works.
+pub fn active_shortcut(status: ShortcutStatus, combo: &str) -> Option<String> {
+    (status == ShortcutStatus::Active).then(|| combo.to_string())
+}
+
+/// The tray's open item, naming the shortcut when there is one.
+pub fn open_label(shortcut: Option<&str>) -> String {
+    match shortcut {
+        Some(combo) => format!("Open clipboard history ({combo})"),
+        None => "Open clipboard history".to_string(),
+    }
+}
+
 /// The tray's "Use Super+V…" item: only where it can help, i.e. GNOME with
 /// Force off and no shortcut registered (the user said "Not now").
 pub fn offers_use_super_v(kind: RegistrarKind, settings: &Settings, status: ShortcutStatus) -> bool {
@@ -312,8 +332,8 @@ fn make_registrar(app: &AppHandle, kind: RegistrarKind, path: Option<PathBuf>) -
 }
 
 /// Startup: load settings, pick the registrar, give back originals left by a
-/// crash, then register or ask.
-pub fn init(app: &AppHandle) {
+/// crash, then register or ask. Returns the plan it carried out.
+pub fn init(app: &AppHandle) -> StartupPlan {
     let path = app.path().app_data_dir().ok().map(|d| d.join(crate::SETTINGS_FILE));
     let loaded = path.as_deref().map(settings::load).unwrap_or_default();
     let kind = detect_kind();
@@ -354,6 +374,7 @@ pub fn init(app: &AppHandle) {
         _ => ShortcutStatus::NotSet,
     };
     *lock(&state.shortcut_status) = status;
+    plan
 }
 
 /// Shows the settings window with `view` selected.
@@ -444,6 +465,14 @@ pub fn show_use_super_v(app: &AppHandle) -> bool {
     let status = *lock(&state.shortcut_status);
     let settings = lock(&state.settings).clone();
     offers_use_super_v(detect_kind(), &settings, status)
+}
+
+/// The working shortcut, if any, as the user should see it.
+pub fn current_shortcut(app: &AppHandle) -> Option<String> {
+    let state = app.state::<AppState>();
+    let status = *lock(&state.shortcut_status);
+    let combo = lock(&state.settings).shortcut.clone();
+    active_shortcut(status, &combo)
 }
 
 /// The current tooltip text.
@@ -717,6 +746,27 @@ mod tests {
     fn macos_has_no_registrar_for_now_and_windows_uses_the_plugin() {
         assert_eq!(kind_for_os("macos", RegistrarKind::Plugin), RegistrarKind::None);
         assert_eq!(kind_for_os("windows", RegistrarKind::Plugin), RegistrarKind::Plugin);
+    }
+
+    #[test]
+    fn the_shortcut_is_shown_only_while_it_works() {
+        assert_eq!(active_shortcut(ShortcutStatus::Active, "Super+V"), Some("Super+V".to_string()));
+        assert_eq!(active_shortcut(ShortcutStatus::NotSet, "Super+V"), None);
+        assert_eq!(active_shortcut(ShortcutStatus::Unavailable, "Super+V"), None);
+    }
+
+    #[test]
+    fn the_tray_open_item_names_the_shortcut() {
+        assert_eq!(open_label(Some("Super+V")), "Open clipboard history (Super+V)");
+        assert_eq!(open_label(None), "Open clipboard history");
+    }
+
+    #[test]
+    fn a_plain_launch_opens_the_popup_unless_the_first_run_dialog_is_up() {
+        assert!(opens_popup_at_launch(StartupPlan::Register));
+        assert!(opens_popup_at_launch(StartupPlan::Idle));
+        assert!(opens_popup_at_launch(StartupPlan::Restore));
+        assert!(!opens_popup_at_launch(StartupPlan::AskFirstRun));
     }
 
     #[test]

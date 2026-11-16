@@ -214,7 +214,10 @@ export default function Popup() {
       >
         {empty ? (
           <p className="px-3 py-8 text-center text-muted">
-            {query.trim() === "" ? "Nothing copied yet" : "No matches"}
+            {query.trim() !== "" ? "No matches" : "Nothing copied yet"}
+            {query.trim() === "" && report?.shortcut ? (
+              <span className="mt-1 block text-xs">Copy something, then press {report.shortcut} to open this list.</span>
+            ) : null}
           </p>
         ) : (
           clips.map((c, i) => (
@@ -234,6 +237,14 @@ export default function Popup() {
         <span className="min-w-0 flex-1 truncate" aria-live="polite">
           {hint ?? (report && !report.autoPasteAvailable ? COPY_ONLY_HINT : KEYS_HINT)}
         </span>
+        {report?.shortcut ? (
+          <kbd
+            title={`${report.shortcut} opens this window from any app`}
+            className="shrink-0 rounded border border-line px-1.5 py-0.5 font-sans text-fg"
+          >
+            {report.shortcut}
+          </kbd>
+        ) : null}
         <button
           type="button"
           tabIndex={-1}

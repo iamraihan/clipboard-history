@@ -216,12 +216,13 @@ pub fn run() {
         .setup(|app| {
             app.manage(AppState::new());
             start(app.handle());
-            shortcut::init(app.handle());
+            let plan = shortcut::init(app.handle());
             // Before the tray: the tray menu reads the update state.
             updater::start(app.handle());
             tray::build(app.handle())?;
-            if std::env::args().any(|a| a == shortcut::TOGGLE_ARG) {
-                // First launch from the shortcut: let the popup page load, then open it.
+            let toggled = std::env::args().any(|a| a == shortcut::TOGGLE_ARG);
+            if toggled || shortcut::opens_popup_at_launch(plan) {
+                // First launch from the shortcut or the app grid: let the popup page load, then open it.
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(400));

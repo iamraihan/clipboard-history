@@ -59,7 +59,19 @@ pub fn hide(app: &AppHandle) {
 
 /// Hidden: remember the focused window, place at the cursor, show, focus and
 /// tell the UI. Visible: hide.
+///
+/// Runs on the main thread whatever the caller's thread. The GNOME shortcut
+/// arrives on the single-instance D-Bus thread; from there `show` is only
+/// queued, so tao's `set_focus` still sees a hidden window and drops the
+/// request, leaving the popup on screen without keyboard focus.
 pub fn toggle(app: &AppHandle) {
+    let handle = app.clone();
+    if let Err(e) = app.run_on_main_thread(move || toggle_now(&handle)) {
+        eprintln!("popup: {e}");
+    }
+}
+
+fn toggle_now(app: &AppHandle) {
     let Some(win) = app.get_webview_window(POPUP) else { return };
     if win.is_visible().unwrap_or(false) {
         let _ = win.hide();

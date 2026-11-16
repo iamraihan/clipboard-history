@@ -31,6 +31,9 @@ pub struct StartupReport {
     /// and the auto-paste setting on). When false the popup tells the user to
     /// press Ctrl+V. Filled in when the report is read, not stored.
     pub auto_paste_available: bool,
+    /// The shortcut that opens the popup ("Super+V"), None while none works.
+    /// Filled in when the report is read, not stored.
+    pub shortcut: Option<String>,
 }
 
 impl StartupReport {
@@ -129,6 +132,9 @@ impl AppState {
         let has_paster = self.paster.lock().unwrap_or_else(|p| p.into_inner()).is_some();
         let enabled = self.settings.lock().unwrap_or_else(|p| p.into_inner()).auto_paste;
         report.auto_paste_available = has_paster && enabled;
+        let status = *self.shortcut_status.lock().unwrap_or_else(|p| p.into_inner());
+        let combo = self.settings.lock().unwrap_or_else(|p| p.into_inner()).shortcut.clone();
+        report.shortcut = crate::shortcut::active_shortcut(status, &combo);
         report
     }
 }

@@ -29,4 +29,9 @@ storeError: string | null,
  * and the auto-paste setting on). When false the popup tells the user to
  * press Ctrl+V. Filled in when the report is read, not stored.
  */
-autoPasteAvailable: boolean, };
+autoPasteAvailable: boolean, 
+/**
+ * The shortcut that opens the popup ("Super+V"), None while none works.
+ * Filled in when the report is read, not stored.
+ */
+shortcut: string | null, };

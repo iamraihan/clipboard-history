@@ -1,6 +1,6 @@
 //! System tray icon and menu.
 //!
-//! Menu: the update line (only when a newer release exists), "Open clipboard history", "Use Super+V…" (GNOME, only while no shortcut
+//! Menu: the update line (only when a newer release exists), "Open clipboard history (<shortcut>)", "Use Super+V…" (GNOME, only while no shortcut
 //! is set), "Reset shortcuts to default", "Quit". The
 //! tooltip carries the shortcut and startup problems. Tauri ignores tooltips on
 //! Linux, so when there is a problem the menu starts with it as disabled lines.
@@ -31,7 +31,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         items.push(Box::new(MenuItem::with_id(app, UPDATE, update.label, update.enabled, None::<&str>)?));
         items.push(Box::new(PredefinedMenuItem::separator(app)?));
     }
-    items.push(Box::new(MenuItem::with_id(app, OPEN, "Open clipboard history", true, None::<&str>)?));
+    items.push(Box::new(MenuItem::with_id(app, OPEN, shortcut::open_label(shortcut::current_shortcut(app).as_deref()), true, None::<&str>)?));
     if shortcut::show_use_super_v(app) {
         items.push(Box::new(MenuItem::with_id(app, USE_SUPER_V, "Use Super+V\u{2026}", true, None::<&str>)?));
     }
