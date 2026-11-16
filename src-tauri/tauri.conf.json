@@ -48,7 +48,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgxRUQ0QzREQjkzMEE0QjcKUldTM3BEQzVUVXp0Z2ZkK1VKam11S0dqMjdIL0ZkQVhuanNGRHl0Ri80TlF5Tkk0citoWEpnQVoK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA2OTgyRjQwNjE2RkQzMTUKUldRVjAyOWhRQytZQm1xanVKdk9kN3QzRlEyZWpmeXU4aHhBeTV1QmxCMDI3NkZQK1NTdXpnR2MK",
       "endpoints": [
         "https://github.com/iamraihan/clipboard-history/releases/latest/download/latest.json"
       ]
