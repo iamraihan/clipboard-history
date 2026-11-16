@@ -98,7 +98,9 @@ Installed apps check for updates on launch and once a day. When one is
 found, the tray menu shows **Update to vX.Y.Z and restart** (Windows, Linux).
 On macOS it shows **Download vX.Y.Z…** and opens the release page instead,
 because silent updates there need a paid Apple Developer ID certificate.
-Debug builds (`pnpm tauri dev`) never check.
+Users can also check by hand from the tray ("Check for updates (vX.Y.Z)").
+Debug builds (`pnpm tauri dev`) never check on their own, only when you
+click that tray line.
 
 ## Choosing the version number
 
