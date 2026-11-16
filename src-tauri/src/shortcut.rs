@@ -111,8 +111,8 @@ pub fn startup_plan(kind: RegistrarKind, settings: &Settings) -> StartupPlan {
 /// plain launch (the app grid, a terminal) does too, so the user sees the app
 /// and its shortcut, except while the first-run dialog asks about Super+V.
 /// Login never does: the app starts in the tray.
-pub fn opens_popup_at_launch(plan: StartupPlan, launch: crate::core::autostart::Launch) -> bool {
-    use crate::core::autostart::Launch;
+pub fn opens_popup_at_launch(plan: StartupPlan, launch: crate::core::launch::Launch) -> bool {
+    use crate::core::launch::Launch;
     match launch {
         Launch::Toggle => true,
         Launch::Plain => plan != StartupPlan::AskFirstRun,
@@ -311,9 +311,7 @@ fn saver(path: Option<PathBuf>) -> impl Fn(&Settings) -> io::Result<()> + Send +
     }
 }
 
-fn lock<T>(m: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|p| p.into_inner())
-}
+use crate::state::lock;
 
 #[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
 fn make_registrar(app: &AppHandle, kind: RegistrarKind, path: Option<PathBuf>) -> Option<Arc<dyn ShortcutRegistrar>> {
@@ -473,10 +471,7 @@ pub fn show_use_super_v(app: &AppHandle) -> bool {
 
 /// The working shortcut, if any, as the user should see it.
 pub fn current_shortcut(app: &AppHandle) -> Option<String> {
-    let state = app.state::<AppState>();
-    let status = *lock(&state.shortcut_status);
-    let combo = lock(&state.settings).shortcut.clone();
-    active_shortcut(status, &combo)
+    app.state::<AppState>().current_shortcut()
 }
 
 /// The current tooltip text.
@@ -767,7 +762,7 @@ mod tests {
 
     #[test]
     fn a_plain_launch_opens_the_popup_unless_the_first_run_dialog_is_up() {
-        use crate::core::autostart::Launch;
+        use crate::core::launch::Launch;
         assert!(opens_popup_at_launch(StartupPlan::Register, Launch::Plain));
         assert!(opens_popup_at_launch(StartupPlan::Idle, Launch::Plain));
         assert!(opens_popup_at_launch(StartupPlan::Restore, Launch::Plain));
@@ -776,7 +771,7 @@ mod tests {
 
     #[test]
     fn the_shortcut_always_opens_the_popup_and_login_never_does() {
-        use crate::core::autostart::Launch;
+        use crate::core::launch::Launch;
         assert!(opens_popup_at_launch(StartupPlan::Register, Launch::Toggle));
         assert!(opens_popup_at_launch(StartupPlan::AskFirstRun, Launch::Toggle));
         assert!(!opens_popup_at_launch(StartupPlan::Register, Launch::Autostart));

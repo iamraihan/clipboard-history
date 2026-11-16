@@ -1,14 +1,38 @@
-import type { ReactNode } from "react";
+import { LogicalSize, getCurrentWindow } from "@tauri-apps/api/window";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 
-/** A single centered question with a row of buttons, in the popup's palette. */
+/** The dialog window's width; its height follows the content. */
+const DIALOG_WIDTH = 460;
+
+/**
+ * A question with a row of buttons, in the popup's palette. The window is
+ * resized to the content, so an error or a long list never pushes the
+ * buttons out of view.
+ */
 export function Dialog({ title, children, actions }: { title: string; children?: ReactNode; actions: ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = (): void => {
+      const height = Math.ceil(el.getBoundingClientRect().height);
+      getCurrentWindow()
+        .setSize(new LogicalSize(DIALOG_WIDTH, height))
+        .catch(() => undefined);
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <main role="alertdialog" aria-labelledby="dialog-title" className="flex h-full flex-col p-6">
+    <main ref={ref} role="alertdialog" aria-labelledby="dialog-title" className="flex flex-col p-6">
       <h1 id="dialog-title" className="text-[15px] font-semibold text-balance text-fg">
         {title}
       </h1>
       <div className="leading-normal">{children}</div>
-      <div className="mt-auto flex flex-wrap justify-end gap-2 pt-5">{actions}</div>
+      <div className="flex flex-wrap justify-end gap-2 pt-6">{actions}</div>
     </main>
   );
 }

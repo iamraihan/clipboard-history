@@ -210,7 +210,7 @@ pub fn run() {
         // A second launch, with or without `--toggle`, opens (toggles) the popup.
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // A second login entry while the app already runs changes nothing.
-            if core::autostart::launch_kind(&argv) != core::autostart::Launch::Autostart {
+            if core::launch::launch_kind(&argv) != core::launch::Launch::Autostart {
                 popup::toggle(app);
             }
         }))
@@ -228,7 +228,7 @@ pub fn run() {
             updater::start(app.handle());
             tray::build(app.handle())?;
             autostart::init(app.handle());
-            let launch = core::autostart::launch_kind(&std::env::args().collect::<Vec<_>>());
+            let launch = core::launch::launch_kind(&std::env::args().collect::<Vec<_>>());
             if shortcut::opens_popup_at_launch(plan, launch) {
                 // First launch from the shortcut or the app grid (not login): let the popup page load, then open it.
                 let handle = app.handle().clone();

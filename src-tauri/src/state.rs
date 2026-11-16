@@ -7,7 +7,7 @@ use crate::platform::{ClipboardBackend, FocusTracker, FocusedWindow, Paster, Sho
 use crate::shortcut::{SettingsView, ShortcutStatus};
 use crate::store::StoreError;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 #[cfg(test)]
 use ts_rs::TS;
@@ -125,17 +125,26 @@ impl AppState {
     }
 }
 
+/// Locks `m`, recovering the data if a thread panicked while holding it.
+pub fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|p| p.into_inner())
+}
+
 impl AppState {
-    /// The StartupReport as the UI sees it, with `auto_paste_available` current.
+    /// The StartupReport as the UI sees it, with `auto_paste_available` and `shortcut` current.
     pub fn report_for_ui(&self) -> StartupReport {
-        let mut report = self.report.lock().unwrap_or_else(|p| p.into_inner()).clone();
-        let has_paster = self.paster.lock().unwrap_or_else(|p| p.into_inner()).is_some();
-        let enabled = self.settings.lock().unwrap_or_else(|p| p.into_inner()).auto_paste;
-        report.auto_paste_available = has_paster && enabled;
-        let status = *self.shortcut_status.lock().unwrap_or_else(|p| p.into_inner());
-        let combo = self.settings.lock().unwrap_or_else(|p| p.into_inner()).shortcut.clone();
-        report.shortcut = crate::shortcut::active_shortcut(status, &combo);
+        let mut report = lock(&self.report).clone();
+        let has_paster = lock(&self.paster).is_some();
+        report.auto_paste_available = has_paster && lock(&self.settings).auto_paste;
+        report.shortcut = self.current_shortcut();
         report
+    }
+
+    /// The working shortcut, if any, as the user should see it.
+    pub fn current_shortcut(&self) -> Option<String> {
+        let status = *lock(&self.shortcut_status);
+        let combo = lock(&self.settings).shortcut.clone();
+        crate::shortcut::active_shortcut(status, &combo)
     }
 }
 

@@ -40,7 +40,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     }
     items.push(Box::new(MenuItem::with_id(app, RESET, "Reset shortcuts to default", true, None::<&str>)?));
     let at_login = crate::autostart::is_enabled(app);
-    items.push(Box::new(CheckMenuItem::with_id(app, START_AT_LOGIN, "Start at login", true, at_login, None::<&str>)?));
+    items.push(Box::new(CheckMenuItem::with_id(app, START_AT_LOGIN, "Start at login", crate::autostart::can_toggle(), at_login, None::<&str>)?));
     if !update.top {
         items.push(Box::new(MenuItem::with_id(app, UPDATE, &update.label, update.enabled, None::<&str>)?));
     }

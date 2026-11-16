@@ -30,9 +30,7 @@ pub enum PasteOutcome {
     NothingToPaste,
 }
 
-fn lock<T>(m: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|p| p.into_inner())
-}
+use crate::state::lock;
 
 fn failed(what: &str, e: impl std::fmt::Display) -> String {
     eprintln!("{what}: {e}");

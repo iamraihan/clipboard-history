@@ -28,6 +28,29 @@ pub fn launch_kind(args: &[String]) -> Launch {
     }
 }
 
+/// What happened to the login entry, for `applied_after`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutostartEvent {
+    /// Startup turned the default on.
+    DefaultEnabled,
+    /// Startup tried to turn the default on and failed; it tries again next start.
+    DefaultFailed,
+    /// The user switched it on or off in the tray.
+    UserChose,
+}
+
+/// `Settings::autostart_default_applied` after `event`: once the default
+/// worked or the user chose, startup never switches it on again.
+pub fn applied_after(applied: bool, event: AutostartEvent) -> bool {
+    applied || matches!(event, AutostartEvent::DefaultEnabled | AutostartEvent::UserChose)
+}
+
+/// Whether the tray's "Start at login" can be clicked: never in a debug build,
+/// where one click would make login start a `target/debug` binary.
+pub fn tray_toggle_enabled(release_build: bool) -> bool {
+    release_build
+}
+
 /// Start at login is on by default: turn it on the first time a release
 /// build runs (`applied` is `Settings::autostart_default_applied`). After that
 /// the user's choice in the tray stands. A debug build never registers itself,
@@ -50,6 +73,26 @@ mod tests {
     #[test]
     fn a_debug_build_never_registers_itself() {
         assert!(!enable_by_default(false, false));
+    }
+
+    #[test]
+    fn any_choice_in_the_tray_ends_the_default() {
+        // Turning the default on failed, then the user switched it off: the
+        // next start must not switch it back on.
+        let applied = applied_after(false, AutostartEvent::DefaultFailed);
+        assert!(!applied);
+        let applied = applied_after(applied, AutostartEvent::UserChose);
+        assert!(applied);
+        assert!(!enable_by_default(applied, true));
+        assert!(applied_after(false, AutostartEvent::DefaultEnabled));
+        assert!(applied_after(true, AutostartEvent::DefaultFailed));
+    }
+
+    #[test]
+    fn only_a_release_build_offers_the_tray_toggle() {
+        // One click in `pnpm tauri dev` would register the target/debug binary.
+        assert!(tray_toggle_enabled(true));
+        assert!(!tray_toggle_enabled(false));
     }
 
     #[test]

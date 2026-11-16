@@ -1,7 +1,7 @@
 //! Popup window lifecycle: show at the cursor, hide on blur or pick.
 
 use crate::platform::{BackendError, FocusTracker, FocusedWindow};
-use crate::state::AppState;
+use crate::state::{lock, AppState};
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow};
@@ -59,20 +59,48 @@ fn place_at_cursor(win: &WebviewWindow) {
 const ACTIVATE_ATTEMPTS: usize = 3;
 const ACTIVATE_GAP: Duration = Duration::from_millis(30);
 
+/// How asking the window manager to activate the popup ended.
+#[derive(Debug)]
+enum Activation {
+    Active,
+    /// The popup was hidden meanwhile (Esc, a second Super+V): stopped asking.
+    Abandoned,
+    /// Every attempt failed while the popup stayed visible.
+    Refused(BackendError),
+}
+
+impl PartialEq for Activation {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::Active, Self::Active) | (Self::Abandoned, Self::Abandoned) | (Self::Refused(_), Self::Refused(_))
+        )
+    }
+}
+
 /// Makes `popup` the active window, retrying while the window manager has
-/// not managed the freshly mapped window yet.
-fn activate(focus: &dyn FocusTracker, popup: &FocusedWindow, attempts: usize) -> Result<(), BackendError> {
-    let mut last = Err(BackendError("no attempt".into()));
+/// not managed the freshly mapped window yet. `shown` is checked before each
+/// attempt, so a popup hidden meanwhile is not activated again.
+fn activate(
+    focus: &dyn FocusTracker,
+    popup: &FocusedWindow,
+    attempts: usize,
+    shown: impl Fn() -> bool,
+) -> Activation {
+    let mut last = BackendError("no attempt".into());
     for i in 0..attempts {
         if i > 0 {
             std::thread::sleep(ACTIVATE_GAP);
         }
-        last = focus.restore(popup);
-        if last.is_ok() {
-            break;
+        if !shown() {
+            return Activation::Abandoned;
+        }
+        match focus.restore(popup) {
+            Ok(()) => return Activation::Active,
+            Err(e) => last = e,
         }
     }
-    last
+    Activation::Refused(last)
 }
 
 /// The popup's X11 window id; None on Wayland and other platforms.
@@ -98,12 +126,17 @@ fn x11_window(_win: &WebviewWindow) -> Option<FocusedWindow> {
 /// GTK saw, which is older than the shortcut's key press, so Mutter's
 /// focus-stealing prevention refuses it and only flags the popup "demands
 /// attention": arrow keys and Esc then go to the previous app.
-fn take_focus(focus: Option<Arc<dyn FocusTracker>>, popup: Option<FocusedWindow>) {
+///
+/// If the window manager still refuses, the popup is hidden: on screen without
+/// the keyboard it could not be closed with Esc and would never see a blur.
+fn take_focus(win: WebviewWindow, focus: Option<Arc<dyn FocusTracker>>, popup: Option<FocusedWindow>) {
     let (Some(focus), Some(popup)) = (focus, popup) else { return };
     // Off the main thread: the activation waits for the window manager.
     std::thread::spawn(move || {
-        if let Err(e) = activate(focus.as_ref(), &popup, ACTIVATE_ATTEMPTS) {
-            eprintln!("popup focus: {e}");
+        let shown = || win.is_visible().unwrap_or(false);
+        if let Activation::Refused(e) = activate(focus.as_ref(), &popup, ACTIVATE_ATTEMPTS, shown) {
+            eprintln!("popup focus: {e}; hiding the popup");
+            let _ = win.hide();
         }
     });
 }
@@ -135,13 +168,13 @@ fn toggle_now(app: &AppHandle) {
         return;
     }
     let state = app.state::<AppState>();
-    let focus = state.focus.lock().unwrap_or_else(|p| p.into_inner()).clone();
+    let focus = lock(&state.focus).clone();
     let current = focus.as_ref().and_then(|f| f.current());
-    *state.focused_before_popup.lock().unwrap_or_else(|p| p.into_inner()) = current;
+    *lock(&state.focused_before_popup) = current;
     place_at_cursor(&win);
     let _ = win.show();
     let _ = win.set_focus();
-    take_focus(focus, x11_window(&win));
+    take_focus(win.clone(), focus, x11_window(&win));
     let _ = app.emit(POPUP_OPENED, ());
 }
 
@@ -170,15 +203,29 @@ mod tests {
     #[test]
     fn activation_retries_while_the_window_manager_catches_up() {
         let wm = Flaky { failures: 2, calls: Mutex::new(0) };
-        assert!(activate(&wm, &FocusedWindow(7), 3).is_ok());
+        assert_eq!(activate(&wm, &FocusedWindow(7), 3, || true), Activation::Active);
         assert_eq!(*wm.calls.lock().unwrap(), 3);
     }
 
     #[test]
     fn activation_gives_up_after_the_last_attempt() {
         let wm = Flaky { failures: 9, calls: Mutex::new(0) };
-        assert!(activate(&wm, &FocusedWindow(7), 3).is_err());
+        assert!(matches!(activate(&wm, &FocusedWindow(7), 3, || true), Activation::Refused(_)));
         assert_eq!(*wm.calls.lock().unwrap(), 3);
+    }
+
+    #[test]
+    fn activation_stops_once_the_popup_is_hidden() {
+        // Esc or a second Super+V while the WM still refuses: stop asking.
+        let wm = Flaky { failures: 9, calls: Mutex::new(0) };
+        let shown = Mutex::new(2u32); // the check before the first ask says "shown", the next says "hidden"
+        let still_shown = || {
+            let mut left = shown.lock().unwrap();
+            *left = left.saturating_sub(1);
+            *left > 0
+        };
+        assert_eq!(activate(&wm, &FocusedWindow(7), 3, still_shown), Activation::Abandoned);
+        assert_eq!(*wm.calls.lock().unwrap(), 1);
     }
 
     #[test]
