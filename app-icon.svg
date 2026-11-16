@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Source of every file in src-tauri/icons/. Regenerate with: pnpm tauri icon app-icon.svg -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="clip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#312E81"/>
+      <stop offset="1" stop-color="#1E1B4B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background tile -->
+  <rect x="32" y="32" width="960" height="960" rx="216" fill="url(#bg)"/>
+
+  <!-- Board -->
+  <rect x="236" y="216" width="552" height="640" rx="72" fill="#FFFFFF"/>
+
+  <!-- Clip -->
+  <rect x="380" y="152" width="264" height="136" rx="48" fill="url(#clip)"/>
+  <rect x="452" y="188" width="120" height="40" rx="20" fill="#6366F1"/>
+
+  <!-- History rows: the newest one highlighted -->
+  <rect x="316" y="356" width="392" height="104" rx="32" fill="#7C3AED"/>
+  <rect x="352" y="394" width="220" height="28" rx="14" fill="#FFFFFF" opacity="0.9"/>
+
+  <rect x="316" y="500" width="392" height="104" rx="32" fill="#E0E7FF"/>
+  <rect x="352" y="538" width="260" height="28" rx="14" fill="#A5B4FC"/>
+
+  <rect x="316" y="644" width="392" height="104" rx="32" fill="#E0E7FF"/>
+  <rect x="352" y="682" width="180" height="28" rx="14" fill="#A5B4FC"/>
+</svg>
