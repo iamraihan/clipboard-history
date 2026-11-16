@@ -194,7 +194,7 @@ export default function Popup() {
   const empty = clips.length === 0;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-line bg-bg">
       {notices.map((n) => (
         <p key={n.text} role={n.role} className="bg-warn-bg px-3 py-1.5 text-xs text-warn-fg">
           {n.text}

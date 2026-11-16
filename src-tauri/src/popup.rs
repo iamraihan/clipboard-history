@@ -1,6 +1,9 @@
 //! Popup window lifecycle: show at the cursor, hide on blur or pick.
 
+use crate::platform::{BackendError, FocusTracker, FocusedWindow};
 use crate::state::AppState;
+use std::sync::Arc;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow};
 
 pub const POPUP: &str = "popup";
@@ -51,6 +54,60 @@ fn place_at_cursor(win: &WebviewWindow) {
     let _ = win.set_position(PhysicalPosition::new(x, y));
 }
 
+/// How often `activate` asks the window manager before giving up; each ask
+/// waits up to `X11Focus`'s own timeout.
+const ACTIVATE_ATTEMPTS: usize = 3;
+const ACTIVATE_GAP: Duration = Duration::from_millis(30);
+
+/// Makes `popup` the active window, retrying while the window manager has
+/// not managed the freshly mapped window yet.
+fn activate(focus: &dyn FocusTracker, popup: &FocusedWindow, attempts: usize) -> Result<(), BackendError> {
+    let mut last = Err(BackendError("no attempt".into()));
+    for i in 0..attempts {
+        if i > 0 {
+            std::thread::sleep(ACTIVATE_GAP);
+        }
+        last = focus.restore(popup);
+        if last.is_ok() {
+            break;
+        }
+    }
+    last
+}
+
+/// The popup's X11 window id; None on Wayland and other platforms.
+#[cfg(target_os = "linux")]
+fn x11_window(win: &WebviewWindow) -> Option<FocusedWindow> {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    match win.window_handle().ok()?.as_raw() {
+        // `c_ulong` is u64 here but u32 on 32-bit targets.
+        #[allow(clippy::useless_conversion)]
+        RawWindowHandle::Xlib(h) => Some(FocusedWindow(u64::from(h.window))),
+        RawWindowHandle::Xcb(h) => Some(FocusedWindow(u64::from(h.window.get()))),
+        _ => None,
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn x11_window(_win: &WebviewWindow) -> Option<FocusedWindow> {
+    None
+}
+
+/// Asks the window manager to activate the popup as a user action (a pager
+/// request). GTK's own `present` stamps the request with the last user time
+/// GTK saw, which is older than the shortcut's key press, so Mutter's
+/// focus-stealing prevention refuses it and only flags the popup "demands
+/// attention": arrow keys and Esc then go to the previous app.
+fn take_focus(focus: Option<Arc<dyn FocusTracker>>, popup: Option<FocusedWindow>) {
+    let (Some(focus), Some(popup)) = (focus, popup) else { return };
+    // Off the main thread: the activation waits for the window manager.
+    std::thread::spawn(move || {
+        if let Err(e) = activate(focus.as_ref(), &popup, ACTIVATE_ATTEMPTS) {
+            eprintln!("popup focus: {e}");
+        }
+    });
+}
+
 pub fn hide(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(POPUP) {
         let _ = win.hide();
@@ -79,17 +136,50 @@ fn toggle_now(app: &AppHandle) {
     }
     let state = app.state::<AppState>();
     let focus = state.focus.lock().unwrap_or_else(|p| p.into_inner()).clone();
-    let current = focus.and_then(|f| f.current());
+    let current = focus.as_ref().and_then(|f| f.current());
     *state.focused_before_popup.lock().unwrap_or_else(|p| p.into_inner()) = current;
     place_at_cursor(&win);
     let _ = win.show();
     let _ = win.set_focus();
+    take_focus(focus, x11_window(&win));
     let _ = app.emit(POPUP_OPENED, ());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Fails `restore` the first `failures` times, counting calls.
+    struct Flaky {
+        failures: usize,
+        calls: Mutex<usize>,
+    }
+
+    impl FocusTracker for Flaky {
+        fn current(&self) -> Option<FocusedWindow> {
+            None
+        }
+        fn restore(&self, _: &FocusedWindow) -> Result<(), BackendError> {
+            let mut calls = self.calls.lock().unwrap();
+            *calls += 1;
+            if *calls > self.failures { Ok(()) } else { Err(BackendError("not yet".into())) }
+        }
+    }
+
+    #[test]
+    fn activation_retries_while_the_window_manager_catches_up() {
+        let wm = Flaky { failures: 2, calls: Mutex::new(0) };
+        assert!(activate(&wm, &FocusedWindow(7), 3).is_ok());
+        assert_eq!(*wm.calls.lock().unwrap(), 3);
+    }
+
+    #[test]
+    fn activation_gives_up_after_the_last_attempt() {
+        let wm = Flaky { failures: 9, calls: Mutex::new(0) };
+        assert!(activate(&wm, &FocusedWindow(7), 3).is_err());
+        assert_eq!(*wm.calls.lock().unwrap(), 3);
+    }
 
     #[test]
     fn popup_stays_on_the_monitor() {

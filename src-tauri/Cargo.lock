@@ -553,6 +553,7 @@ dependencies = [
  "hex",
  "image",
  "keyring",
+ "raw-window-handle",
  "rusqlite",
  "serde",
  "serde_json",

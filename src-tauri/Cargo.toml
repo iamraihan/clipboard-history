@@ -45,6 +45,9 @@ tauri-plugin-updater = "2.14.1"
 # One platform store per OS.
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"] }
+# The popup's X11 window id (Tauri implements HasWindowHandle), so the popup can
+# ask the WM for focus; already in the tree via Tauri.
+raw-window-handle = "0.6.2"
 # X11 / XWayland clipboard backend. Pure-Rust connection; `allow-unsafe-code` stays off.
 x11rb = { version = "0.14.0", features = ["xfixes", "xtest"] }
 
