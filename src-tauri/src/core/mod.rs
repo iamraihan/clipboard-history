@@ -3,3 +3,4 @@
 pub mod clip;
 pub mod rules;
 pub mod settings;
+pub mod update;

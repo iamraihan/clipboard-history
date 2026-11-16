@@ -39,6 +39,12 @@ allow = [
 crate = "sqlcipher-src"
 allow = ["blessing", "WTFPL"]
 
+# Mozilla's root CA list (data, permissive). Needed by the updater's HTTPS
+# client: tauri-plugin-updater -> reqwest -> rustls-platform-verifier.
+[[licenses.exceptions]]
+crate = "webpki-root-certs"
+allow = ["CDLA-Permissive-2.0"]
+
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"

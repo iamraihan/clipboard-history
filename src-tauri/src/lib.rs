@@ -8,6 +8,7 @@ mod popup;
 pub mod state;
 pub mod store;
 mod tray;
+mod updater;
 
 use crate::core::clip::content_hash;
 use crate::core::rules::Decision;
@@ -206,7 +207,8 @@ pub fn run() {
     let mut builder = tauri::Builder::default()
         // First, so a second launch never gets as far as opening the store.
         // A second launch, with or without `--toggle`, opens (toggles) the popup.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| popup::toggle(app)));
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| popup::toggle(app)))
+        .plugin(tauri_plugin_updater::Builder::new().build());
     if shortcut::uses_plugin() {
         builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
     }
@@ -215,6 +217,8 @@ pub fn run() {
             app.manage(AppState::new());
             start(app.handle());
             shortcut::init(app.handle());
+            // Before the tray: the tray menu reads the update state.
+            updater::start(app.handle());
             tray::build(app.handle())?;
             if std::env::args().any(|a| a == shortcut::TOGGLE_ARG) {
                 // First launch from the shortcut: let the popup page load, then open it.

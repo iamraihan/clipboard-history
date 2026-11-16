@@ -5,7 +5,7 @@ description: Use when editing anything under src-tauri/src/platform/, or changin
 
 # Platform clipboard rules
 
-Read first: `ARCHITECTURE.md`, `GLOSSARY.md`, [ADR 0001](../../../docs/adr/0001-gnome-wayland-clipboard-via-xwayland.md). Research doc: [platform APIs](../../../docs/research/clipboard-history-platform-apis.md) (`R` below). Spec: `docs/superpowers/specs/2026-11-12-clipboard-history-design.md` section 4.6.
+Read first: `ARCHITECTURE.md`, `GLOSSARY.md`, [ADR 0001](../../../docs/adr/0001-gnome-wayland-clipboard-via-xwayland.md). Research doc: [platform APIs](../../../docs/research/clipboard-history-platform-apis.md) (`R` below).
 
 Decisions stay in `src-tauri/src/core/` (pure, take `now`); backends only do I/O. Linux code lives in `platform/linux/` behind `#[cfg(target_os = "linux")]`. Backends are tested against `platform/fake.rs`; no `unsafe` (`unsafe_code = "forbid"`).
 

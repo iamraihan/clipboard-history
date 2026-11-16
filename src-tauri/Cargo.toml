@@ -37,6 +37,8 @@ tauri-plugin-global-shortcut = "2.4.1"
 # Second launch (the GNOME keybinding runs `<app> --toggle`) forwards to the running app.
 # 2.5.4, not 2.5.5: 2.5.5 is under 2 weeks old (published 2026-10-28).
 tauri-plugin-single-instance = "=2.5.4"
+# In-app updates from GitHub Releases (latest.json, signed with the Tauri updater key).
+tauri-plugin-updater = "2.14.1"
 
 # keyring 3.x, not 4.x: 4.x replaced the feature set (no sync-secret-service /
 # crypto-rust / apple-native / windows-native) and splits stores into keyring-core.
