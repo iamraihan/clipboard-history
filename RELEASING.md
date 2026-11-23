@@ -131,5 +131,15 @@ click that tray line.
 - The Release workflow (`.github/workflows/release.yml`) only triggers on tags
   matching `v*`. CI (`.github/workflows/ci.yml`) runs on every push to main
   and every PR.
-- Only Linux has a working clipboard Backend so far; the macOS and Windows
-  installers start but don't watch the clipboard until those Backends land.
+- Linux has a working clipboard Backend and macOS a **beta** one; the Windows
+  installer starts but doesn't watch the clipboard until its Backend lands.
+- macOS builds are **unsigned**. Users open the app once through System
+  Settings → Privacy & Security, and macOS forgets the Accessibility grant
+  (auto-paste) on every update. Say so in the release notes until signing is
+  set up, and mention the beta checklist in `.claude/skills/desktop-test/SKILL.md`.
+- **Signing macOS later** (needs the $99/yr Apple Developer Program, see
+  `docs/research/macos-port-feasibility.md` §7): add the repository secrets
+  `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`
+  and either `APPLE_ID` / `APPLE_PASSWORD` / `APPLE_TEAM_ID` or the
+  `APPLE_API_*` set, pass them to `tauri-action` in `release.yml`, then switch
+  `METHOD` in `src-tauri/src/updater.rs` to `InPlace` on macOS.

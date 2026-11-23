@@ -5,6 +5,8 @@
 pub mod fake;
 #[cfg(target_os = "linux")]
 pub mod linux;
+#[cfg(target_os = "macos")]
+pub mod macos;
 
 use crate::core::clip::{ClipEvent, Format};
 use crate::core::settings::Settings;
@@ -50,6 +52,11 @@ pub trait ClipboardBackend: Send + Sync {
 
 pub trait Paster: Send + Sync {
     fn paste(&self, target: &FocusedWindow, plain: bool) -> Result<(), BackendError>;
+    /// Whether `paste` can work right now (macOS: the Accessibility grant,
+    /// which the user can give or take back while the app runs).
+    fn ready(&self) -> bool {
+        true
+    }
 }
 
 pub trait FocusTracker: Send + Sync {

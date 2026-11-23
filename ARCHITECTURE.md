@@ -21,9 +21,9 @@ Same conventions as `prayer-times`: Rust is the single source of truth for IPC t
 
 | Module | Role |
 |---|---|
-| `core` | Clip model, rules (duplicates, skip, retention, echo), search, settings, update tray line. Pure, no side effects. |
+| `core` | Clip model, rules (duplicates, skip, retention, echo), search, settings, update tray line, macOS pasteboard decisions (`pasteboard`: secret markers, own-write detection, type mapping). Pure, no side effects. |
 | `store` | SQLite history storage and encryption key handling. |
-| `platform` | Backend traits and per-OS implementations; Linux-only code under `platform/linux/` behind `#[cfg(target_os = "linux")]`. |
+| `platform` | Backend traits and per-OS implementations; Linux-only code under `platform/linux/` behind `#[cfg(target_os = "linux")]`, macOS-only code under `platform/macos/` behind `#[cfg(target_os = "macos")]` (pasteboard polling, auto-paste; beta). |
 | `engine` | Receives ClipEvents, applies `core` decisions, runs side effects (store, clipboard, windows, tray). |
 | `commands` | Tauri commands the frontend calls. |
 | `tray` | Tray icon and menu. |

@@ -47,6 +47,19 @@ Shortcut (record gsettings state first)
 12c. Dialog sizing: the first-run and quit dialogs fit their content; with an error showing (e.g. gsettings failing) the buttons stay visible.
 13. Wayland only: ADR 0001 "Still to confirm" (real login, native apps, on-demand Xwayland).
 
+## Manual checklist (macOS beta)
+No Mac was available when the macOS Backend was written; CI only runs its unit tests on a private pasteboard. Before calling a macOS release more than beta, run this on macOS 15 and 27:
+1. Install the DMG; allow it in System Settings → Privacy & Security (unsigned). No Dock icon; the menu-bar icon shows the menu.
+2. First copy: note whether a "Paste from Other Apps" prompt appears; choose Allow. Set it to Deny, restart: the tray shows "Clipboard watching is off" with the reason.
+3. Copy text, rich text (Safari), an image (Preview "Copy"), files (Finder): each appears. An image copied as TIFF only is not saved (known gap).
+4. Copy a password from 1Password/KeePassXC/Bitwarden: not saved. Note which app, and whether it was skipped by marker or not at all.
+5. Ctrl+Cmd+V opens the popup at the pointer; Cmd+V still pastes normally everywhere.
+6. Pick an item: the first time macOS asks for Accessibility and the item is only copied (popup said "Cmd+V"). Grant it, pick again: it pastes into TextEdit, Terminal, Safari's address bar. The prompt only comes after focus went back to the previous app; if it never appears, note where focus ended up. With settings open, a pick must not hide the settings window.
+7. Esc closes the popup and the previous app has the keyboard again. Repeat over a full-screen app (other Space).
+8. A non-US layout (e.g. Dvorak – QWERTY ⌘): paste still works.
+9. Start at login on, log out and in: the app starts in the menu bar only (no popup). Note any "background item added" notification.
+10. Update to a newer build: is the Accessibility grant kept? (Unsigned builds are expected to lose it.)
+
 ## Reset everything
 Tray "Reset shortcuts to default" first, quit the app, then:
 ```
