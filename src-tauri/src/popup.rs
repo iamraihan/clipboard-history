@@ -28,7 +28,7 @@ pub fn clamp_to_monitor(
 
 /// The pointer, only on a real X11 session; on XWayland it would be stale.
 #[cfg(target_os = "linux")]
-fn cursor_position() -> Option<(i32, i32)> {
+fn cursor_position(_app: &AppHandle) -> Option<(i32, i32)> {
     use crate::platform::linux::{choose_from_env, pointer, LinuxBackendChoice};
     match choose_from_env(|k| std::env::var(k).ok()) {
         LinuxBackendChoice::X11 => pointer::cursor_position(),
@@ -36,13 +36,20 @@ fn cursor_position() -> Option<(i32, i32)> {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
-fn cursor_position() -> Option<(i32, i32)> {
+/// Tauri's own cursor position works on macOS (physical pixels).
+#[cfg(target_os = "macos")]
+fn cursor_position(app: &AppHandle) -> Option<(i32, i32)> {
+    let p = app.cursor_position().ok()?;
+    Some((p.x.round() as i32, p.y.round() as i32))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn cursor_position(_app: &AppHandle) -> Option<(i32, i32)> {
     None
 }
 
-fn place_at_cursor(win: &WebviewWindow) {
-    let Some((cx, cy)) = cursor_position() else { return };
+fn place_at_cursor(app: &AppHandle, win: &WebviewWindow) {
+    let Some((cx, cy)) = cursor_position(app) else { return };
     let Ok(size) = win.outer_size() else { return };
     let Ok(Some(mon)) = win.monitor_from_point(f64::from(cx), f64::from(cy)) else { return };
     let (mp, ms) = (mon.position(), mon.size());
@@ -141,9 +148,24 @@ fn take_focus(win: WebviewWindow, focus: Option<Arc<dyn FocusTracker>>, popup: O
     });
 }
 
+/// Whether hiding the popup also hides the app. On macOS the popup activates
+/// our app, and hiding only the window leaves the previous app without the
+/// keyboard; hiding the app hands activation back to it (Esc, or a pick
+/// before the paste). Not while settings is open: it would vanish too.
+pub fn hides_app_too(os: &str, settings_visible: bool) -> bool {
+    os == "macos" && !settings_visible
+}
+
 pub fn hide(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(POPUP) {
         let _ = win.hide();
+    }
+    let settings_visible = app
+        .get_webview_window(crate::shortcut::SETTINGS_WINDOW)
+        .is_some_and(|w| w.is_visible().unwrap_or(false));
+    if hides_app_too(std::env::consts::OS, settings_visible) {
+        #[cfg(target_os = "macos")]
+        let _ = app.hide();
     }
 }
 
@@ -164,14 +186,17 @@ pub fn toggle(app: &AppHandle) {
 fn toggle_now(app: &AppHandle) {
     let Some(win) = app.get_webview_window(POPUP) else { return };
     if win.is_visible().unwrap_or(false) {
-        let _ = win.hide();
+        hide(app);
         return;
     }
     let state = app.state::<AppState>();
     let focus = lock(&state.focus).clone();
     let current = focus.as_ref().and_then(|f| f.current());
     *lock(&state.focused_before_popup) = current;
-    place_at_cursor(&win);
+    place_at_cursor(app, &win);
+    // macOS: undo the app hide that handed focus back last time.
+    #[cfg(target_os = "macos")]
+    let _ = app.show();
     let _ = win.show();
     let _ = win.set_focus();
     take_focus(win.clone(), focus, x11_window(&win));
@@ -198,6 +223,15 @@ mod tests {
             *calls += 1;
             if *calls > self.failures { Ok(()) } else { Err(BackendError("not yet".into())) }
         }
+    }
+
+    #[test]
+    fn hiding_the_popup_hands_focus_back_only_on_macos_without_settings() {
+        assert!(hides_app_too("macos", false));
+        // Hiding the app would hide the open settings window too.
+        assert!(!hides_app_too("macos", true));
+        assert!(!hides_app_too("linux", false));
+        assert!(!hides_app_too("windows", false));
     }
 
     #[test]

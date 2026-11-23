@@ -57,10 +57,56 @@ fn detect_kind() -> RegistrarKind {
     kind_for_os(std::env::consts::OS, RegistrarKind::Plugin)
 }
 
-/// macOS gets no registrar until Plan 3 (Ctrl+Cmd+V): Cmd+V must never be taken.
+/// macOS and Windows register through the plugin; on macOS the combo goes
+/// through `effective_shortcut` first, so Cmd+V is never taken.
 #[cfg_attr(target_os = "linux", allow(dead_code))]
-fn kind_for_os(os: &str, plugin: RegistrarKind) -> RegistrarKind {
-    if os == "macos" { RegistrarKind::None } else { plugin }
+fn kind_for_os(_os: &str, plugin: RegistrarKind) -> RegistrarKind {
+    plugin
+}
+
+/// The combo to register. On macOS the plugin reads `Super` as Cmd, so a
+/// Super+V (Cmd+V) combo, the default before macOS support or one copied
+/// from Linux, would take the system's paste key: use the macOS default.
+pub fn effective_shortcut(os: &str, combo: &str) -> String {
+    let parts: Vec<&str> = combo.split('+').map(str::trim).collect();
+    let cmd_v = parts.len() == 2 && parts.iter().any(|p| is_cmd(p)) && parts.iter().any(|p| p.eq_ignore_ascii_case("v"));
+    if os == "macos" && cmd_v {
+        settings::default_shortcut("macos").to_string()
+    } else {
+        combo.to_string()
+    }
+}
+
+/// The plugin's names for the Cmd key on macOS.
+fn is_cmd(part: &str) -> bool {
+    ["super", "cmd", "command"].iter().any(|c| part.eq_ignore_ascii_case(c))
+}
+
+/// A combo as the user should read it: macOS key names there
+/// ("Control+Super+V" is "Ctrl+Cmd+V"), the combo unchanged elsewhere.
+pub fn shortcut_label(os: &str, combo: &str) -> String {
+    if os != "macos" {
+        return combo.to_string();
+    }
+    combo
+        .split('+')
+        .map(str::trim)
+        .map(|p| {
+            if is_cmd(p) {
+                "Cmd"
+            } else if p.eq_ignore_ascii_case("control") || p.eq_ignore_ascii_case("ctrl") {
+                "Ctrl"
+            } else {
+                p
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
+/// What the user presses to paste a copied Clip themselves.
+pub fn manual_paste_keys(os: &str) -> &'static str {
+    if os == "macos" { "Cmd+V" } else { "Ctrl+V" }
 }
 
 /// Whether the global-shortcut plugin must be loaded (it is not on GNOME,
@@ -137,6 +183,16 @@ pub fn open_label(shortcut: Option<&str>) -> String {
 /// Force off and no shortcut registered (the user said "Not now").
 pub fn offers_use_super_v(kind: RegistrarKind, settings: &Settings, status: ShortcutStatus) -> bool {
     kind == RegistrarKind::Gnome && !settings.force_super_v && status != ShortcutStatus::Active
+}
+
+/// The shortcut state after Reset to default: GNOME's keybinding is gone,
+/// the plugin's combo (macOS, X11 outside GNOME) is untouched.
+pub fn status_after_reset(kind: RegistrarKind, before: ShortcutStatus) -> ShortcutStatus {
+    match kind {
+        RegistrarKind::Gnome => ShortcutStatus::NotSet,
+        RegistrarKind::Plugin => before,
+        RegistrarKind::None => ShortcutStatus::Unavailable,
+    }
 }
 
 /// Whether the shortcut works, for the tray.
@@ -359,7 +415,7 @@ pub fn init(app: &AppHandle) -> StartupPlan {
         }
         plan = startup_plan(kind, &lock(&state.settings));
     }
-    let shortcut = lock(&state.settings).shortcut.clone();
+    let shortcut = effective_shortcut(std::env::consts::OS, &lock(&state.settings).shortcut);
     let status = match (plan, registrar) {
         (StartupPlan::Register, Some(reg)) => match reg.register(&shortcut) {
             Ok(()) => ShortcutStatus::Active,
@@ -435,7 +491,11 @@ pub fn run_first_run_choice(app: &AppHandle, use_super_v: bool) -> Result<Option
 
 pub fn run_reset(app: &AppHandle) -> Result<(), String> {
     with_settings(app, |s, reg, save| reset_shortcuts(s, reg, save))?;
-    *lock(&app.state::<AppState>().shortcut_status) = ShortcutStatus::NotSet;
+    {
+        let state = app.state::<AppState>();
+        let mut status = lock(&state.shortcut_status);
+        *status = status_after_reset(detect_kind(), *status);
+    }
     crate::tray::refresh(app);
     Ok(())
 }
@@ -650,7 +710,8 @@ mod tests {
     #[test]
     fn first_run_yes_forces_registers_and_marks_done() {
         let reg = FakeRegistrar::default();
-        let mut s = Settings::default();
+        // First run is GNOME's flow; pin its combo so the test means the same on every OS.
+        let mut s = Settings { shortcut: "Super+V".into(), ..Settings::default() };
         let report = first_run_choice(&mut s, Some(&reg), true, &saved_ok).unwrap();
         assert_eq!(report, Some(ForceReport { freed_from: vec!["s k".into()] }));
         assert_eq!(reg.calls(), ["force", "register Super+V"]);
@@ -742,9 +803,39 @@ mod tests {
     }
 
     #[test]
-    fn macos_has_no_registrar_for_now_and_windows_uses_the_plugin() {
-        assert_eq!(kind_for_os("macos", RegistrarKind::Plugin), RegistrarKind::None);
+    fn macos_and_windows_use_the_plugin() {
+        assert_eq!(kind_for_os("macos", RegistrarKind::Plugin), RegistrarKind::Plugin);
         assert_eq!(kind_for_os("windows", RegistrarKind::Plugin), RegistrarKind::Plugin);
+    }
+
+    #[test]
+    fn macos_never_registers_cmd_v() {
+        for combo in ["Super+V", "v+cmd", "Command+V", "super+v"] {
+            assert_eq!(effective_shortcut("macos", combo), "Control+Super+V", "{combo}");
+        }
+        assert_eq!(effective_shortcut("macos", "Control+Super+V"), "Control+Super+V");
+        assert_eq!(effective_shortcut("macos", "Shift+Super+V"), "Shift+Super+V");
+        assert_eq!(effective_shortcut("linux", "Super+V"), "Super+V");
+    }
+
+    #[test]
+    fn reset_keeps_a_plugin_shortcut_working() {
+        // The plugin registrar has nothing to give back; its combo stays registered.
+        use ShortcutStatus::*;
+        assert_eq!(status_after_reset(RegistrarKind::Plugin, Active), Active);
+        assert_eq!(status_after_reset(RegistrarKind::Plugin, NotSet), NotSet);
+        // GNOME: Reset removes our keybinding.
+        assert_eq!(status_after_reset(RegistrarKind::Gnome, Active), NotSet);
+        assert_eq!(status_after_reset(RegistrarKind::None, Unavailable), Unavailable);
+    }
+
+    #[test]
+    fn macos_shows_mac_key_names() {
+        assert_eq!(shortcut_label("macos", "Control+Super+V"), "Ctrl+Cmd+V");
+        assert_eq!(shortcut_label("linux", "Super+V"), "Super+V");
+        assert_eq!(manual_paste_keys("macos"), "Cmd+V");
+        assert_eq!(manual_paste_keys("linux"), "Ctrl+V");
+        assert_eq!(manual_paste_keys("windows"), "Ctrl+V");
     }
 
     #[test]

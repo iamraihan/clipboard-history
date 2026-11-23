@@ -45,7 +45,7 @@ impl Default for Settings {
             limits: Limits::default(),
             paused: false,
             excluded_apps: Vec::new(),
-            shortcut: "Super+V".into(),
+            shortcut: default_shortcut(std::env::consts::OS).into(),
             force_super_v: false,
             auto_paste: true,
             first_run_done: false,
@@ -53,6 +53,12 @@ impl Default for Settings {
             autostart_default_applied: false,
         }
     }
+}
+
+/// The shortcut a new install gets. On macOS Super is Cmd and Cmd+V is the
+/// system paste, so it is Ctrl+Cmd+V there.
+pub fn default_shortcut(os: &str) -> &'static str {
+    if os == "macos" { "Control+Super+V" } else { "Super+V" }
 }
 
 /// Decode one field; a missing key or a wrong type gives `default`.
@@ -141,11 +147,18 @@ mod tests {
     }
 
     #[test]
+    fn macos_default_shortcut_is_ctrl_cmd_v() {
+        assert_eq!(default_shortcut("macos"), "Control+Super+V");
+        assert_eq!(default_shortcut("linux"), "Super+V");
+        assert_eq!(default_shortcut("windows"), "Super+V");
+    }
+
+    #[test]
     fn missing_file_gives_defaults() {
         let p = temp_path("missing");
         let s = load(&p);
         assert_eq!(s.limits.max_items, 100);
-        assert_eq!(s.shortcut, "Super+V");
+        assert_eq!(s.shortcut, default_shortcut(std::env::consts::OS));
         assert!(s.auto_paste && !s.force_super_v && !s.paused);
         assert!(!s.autostart_default_applied);
         std::fs::remove_dir_all(p.parent().unwrap()).unwrap();

@@ -41,7 +41,13 @@ fn make_backend() -> Result<Arc<dyn ClipboardBackend>, String> {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+fn make_backend() -> Result<Arc<dyn ClipboardBackend>, String> {
+    use crate::platform::macos::{MacBackend, PasteboardName};
+    Ok(Arc::new(MacBackend::new(PasteboardName::General)))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn make_backend() -> Result<Arc<dyn ClipboardBackend>, String> {
     Err("This platform is not supported yet".into())
 }
@@ -49,7 +55,7 @@ fn make_backend() -> Result<Arc<dyn ClipboardBackend>, String> {
 /// X11 only: the Paster and FocusTracker. XWayland and other sessions get
 /// none (copy only; the user presses Ctrl+V).
 #[cfg(target_os = "linux")]
-fn make_paste() -> Option<(Arc<dyn platform::Paster>, Arc<dyn platform::FocusTracker>)> {
+fn make_paste(_app: &AppHandle) -> Option<(Arc<dyn platform::Paster>, Arc<dyn platform::FocusTracker>)> {
     use crate::platform::linux::{choose_from_env, x11_paste::{X11Focus, X11Paster}, LinuxBackendChoice};
     if choose_from_env(|k| std::env::var(k).ok()) != LinuxBackendChoice::X11 {
         return None;
@@ -64,8 +70,19 @@ fn make_paste() -> Option<(Arc<dyn platform::Paster>, Arc<dyn platform::FocusTra
     }
 }
 
-#[cfg(not(target_os = "linux"))]
-fn make_paste() -> Option<(Arc<dyn platform::Paster>, Arc<dyn platform::FocusTracker>)> {
+/// macOS: always present; `MacPaster::ready` says whether Accessibility is
+/// granted. Hiding our app hands activation back to the previous one.
+#[cfg(target_os = "macos")]
+fn make_paste(app: &AppHandle) -> Option<(Arc<dyn platform::Paster>, Arc<dyn platform::FocusTracker>)> {
+    use crate::platform::macos::{MacFocus, MacPaster};
+    let handle = app.clone();
+    // Through popup::hide, so an open settings window is never hidden.
+    let focus = MacFocus::new(move || popup::hide(&handle));
+    Some((Arc::new(MacPaster), Arc::new(focus)))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn make_paste(_app: &AppHandle) -> Option<(Arc<dyn platform::Paster>, Arc<dyn platform::FocusTracker>)> {
     None
 }
 
@@ -158,7 +175,7 @@ fn start(app: &AppHandle) {
             set_report(app, |r| StartupFailure::Backend(why).record(r));
         }
     }
-    if let Some((paster, focus)) = make_paste() {
+    if let Some((paster, focus)) = make_paste(app) {
         let state = app.state::<AppState>();
         *state.paster.lock().unwrap_or_else(|p| p.into_inner()) = Some(paster);
         *state.focus.lock().unwrap_or_else(|p| p.into_inner()) = Some(focus);
@@ -222,6 +239,9 @@ pub fn run() {
     builder
         .setup(|app| {
             app.manage(AppState::new());
+            // macOS: a menu-bar app, no Dock icon; it can still activate its windows.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             start(app.handle());
             let plan = shortcut::init(app.handle());
             // Before the tray: the tray menu reads the update state.
@@ -257,7 +277,7 @@ pub fn run() {
             // Hide the popup when it loses focus. In dev, focusing devtools hides it too.
             if window.label() == popup::POPUP {
                 if let tauri::WindowEvent::Focused(false) = event {
-                    let _ = window.hide();
+                    popup::hide(window.app_handle());
                 }
             }
             // Closing settings only hides it (the tray reopens it); an open

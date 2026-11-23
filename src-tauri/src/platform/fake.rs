@@ -51,14 +51,19 @@ impl ClipboardBackend for FakeBackend {
     }
 }
 
-/// Records paste calls; `fail` makes `paste` fail.
+/// Records paste calls; `fail` makes `paste` fail, `not_ready` makes `ready` false.
 #[derive(Clone, Default)]
 pub struct FakePaster {
     pub pastes: Arc<Mutex<Vec<(FocusedWindow, bool)>>>,
     pub fail: bool,
+    pub not_ready: bool,
 }
 
 impl Paster for FakePaster {
+    fn ready(&self) -> bool {
+        !self.not_ready
+    }
+
     fn paste(&self, target: &FocusedWindow, plain: bool) -> Result<(), BackendError> {
         if self.fail {
             return Err(BackendError("paste failed".into()));

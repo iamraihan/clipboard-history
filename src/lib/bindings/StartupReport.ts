@@ -27,11 +27,17 @@ storeError: string | null,
 /**
  * Picking an item pastes it into the previous window (X11 with a Paster
  * and the auto-paste setting on). When false the popup tells the user to
- * press Ctrl+V. Filled in when the report is read, not stored.
+ * press `manual_paste_keys`. Filled in when the report is read, not stored.
  */
 autoPasteAvailable: boolean, 
 /**
- * The shortcut that opens the popup ("Super+V"), None while none works.
+ * The shortcut that opens the popup as the user reads it ("Super+V",
+ * "Ctrl+Cmd+V" on macOS), None while none works.
  * Filled in when the report is read, not stored.
  */
-shortcut: string | null, };
+shortcut: string | null, 
+/**
+ * What the user presses to paste themselves ("Ctrl+V", "Cmd+V" on macOS).
+ * Filled in when the report is read, not stored.
+ */
+manualPasteKeys: string, };

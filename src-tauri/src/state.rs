@@ -29,11 +29,15 @@ pub struct StartupReport {
     pub store_error: Option<String>,
     /// Picking an item pastes it into the previous window (X11 with a Paster
     /// and the auto-paste setting on). When false the popup tells the user to
-    /// press Ctrl+V. Filled in when the report is read, not stored.
+    /// press `manual_paste_keys`. Filled in when the report is read, not stored.
     pub auto_paste_available: bool,
-    /// The shortcut that opens the popup ("Super+V"), None while none works.
+    /// The shortcut that opens the popup as the user reads it ("Super+V",
+    /// "Ctrl+Cmd+V" on macOS), None while none works.
     /// Filled in when the report is read, not stored.
     pub shortcut: Option<String>,
+    /// What the user presses to paste themselves ("Ctrl+V", "Cmd+V" on macOS).
+    /// Filled in when the report is read, not stored.
+    pub manual_paste_keys: String,
 }
 
 impl StartupReport {
@@ -131,20 +135,23 @@ pub fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl AppState {
-    /// The StartupReport as the UI sees it, with `auto_paste_available` and `shortcut` current.
+    /// The StartupReport as the UI sees it, with `auto_paste_available`,
+    /// `shortcut` and `manual_paste_keys` current.
     pub fn report_for_ui(&self) -> StartupReport {
         let mut report = lock(&self.report).clone();
-        let has_paster = lock(&self.paster).is_some();
-        report.auto_paste_available = has_paster && lock(&self.settings).auto_paste;
+        let ready = lock(&self.paster).as_ref().is_some_and(|p| p.ready());
+        report.auto_paste_available = ready && lock(&self.settings).auto_paste;
         report.shortcut = self.current_shortcut();
+        report.manual_paste_keys = crate::shortcut::manual_paste_keys(std::env::consts::OS).to_string();
         report
     }
 
     /// The working shortcut, if any, as the user should see it.
     pub fn current_shortcut(&self) -> Option<String> {
         let status = *lock(&self.shortcut_status);
-        let combo = lock(&self.settings).shortcut.clone();
-        crate::shortcut::active_shortcut(status, &combo)
+        let os = std::env::consts::OS;
+        let combo = crate::shortcut::effective_shortcut(os, &lock(&self.settings).shortcut);
+        crate::shortcut::active_shortcut(status, &crate::shortcut::shortcut_label(os, &combo))
     }
 }
 
@@ -220,6 +227,27 @@ mod tests {
         assert!(state.report_for_ui().auto_paste_available);
         state.settings.lock().unwrap().auto_paste = false;
         assert!(!state.report_for_ui().auto_paste_available);
+    }
+
+    #[test]
+    fn auto_paste_is_unavailable_while_the_paster_is_not_ready() {
+        // macOS without the Accessibility grant: the popup must say "copy".
+        let state = AppState::new();
+        let paster = crate::platform::fake::FakePaster { not_ready: true, ..Default::default() };
+        *state.paster.lock().unwrap() = Some(Arc::new(paster));
+        assert!(!state.report_for_ui().auto_paste_available);
+    }
+
+    #[test]
+    fn report_names_the_manual_paste_keys_and_the_shortcut_for_this_os() {
+        let state = AppState::new();
+        let os = std::env::consts::OS;
+        *state.shortcut_status.lock().unwrap() = crate::shortcut::ShortcutStatus::Active;
+        state.settings.lock().unwrap().shortcut = "Control+Super+V".into();
+        let report = state.report_for_ui();
+        assert_eq!(report.manual_paste_keys, if os == "macos" { "Cmd+V" } else { "Ctrl+V" });
+        let shown = if os == "macos" { "Ctrl+Cmd+V" } else { "Control+Super+V" };
+        assert_eq!(report.shortcut.as_deref(), Some(shown));
     }
 
     #[test]

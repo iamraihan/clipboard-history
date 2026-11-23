@@ -17,12 +17,15 @@ const KEYS: readonly (readonly [string, string])[] = [
   ["Shift+Enter", "Plain text"],
   ["Esc", "Close"],
 ];
-// Where the app cannot paste for you (Wayland), picking only copies.
-const COPY_ONLY_KEYS: readonly (readonly [string, string])[] = [
-  ["Enter", "Copy"],
-  ["Ctrl+V", "Paste it"],
-  ["Esc", "Close"],
-];
+// Where the app cannot paste for you (Wayland, macOS without Accessibility),
+// picking only copies; the user pastes with the OS's own keys.
+function copyOnlyKeys(pasteKeys: string): readonly (readonly [string, string])[] {
+  return [
+    ["Enter", "Copy"],
+    [pasteKeys, "Paste it"],
+    ["Esc", "Close"],
+  ];
+}
 
 function Kbd({ children }: { children: string }) {
   return (
@@ -270,7 +273,7 @@ export default function Popup() {
       <footer className="flex h-8 items-center gap-2 border-t border-line pr-1.5 pl-3 text-xs text-muted">
         <span className="flex min-w-0 flex-1 items-center gap-3 truncate" aria-live="polite">
           {hint ??
-            (report && !report.autoPasteAvailable ? COPY_ONLY_KEYS : KEYS).map(([key, action]) => (
+            (report && !report.autoPasteAvailable ? copyOnlyKeys(report.manualPasteKeys) : KEYS).map(([key, action]) => (
               <span key={key} className="flex shrink-0 items-center gap-1">
                 <Kbd>{key}</Kbd>
                 {action}

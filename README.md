@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Downloads](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fiamraihan%2Fclipboard-history%2Fbadges%2Fdownloads.json)](https://github.com/iamraihan/clipboard-history/releases)
 
-A cross-platform clipboard history app built with Tauri 2. Ubuntu/Linux first; macOS and Windows to follow. Clipboard data stays on the machine.
+A cross-platform clipboard history app built with Tauri 2. Ubuntu/Linux first; macOS in beta; Windows to follow. Clipboard data stays on the machine.
 
 ## Install
 
@@ -15,7 +15,7 @@ Grab the latest installer from the [Releases page](https://github.com/iamraihan/
 | ------------ | ---------------- |
 | Ubuntu/Linux | the `.AppImage` (supports in-app updates), or `.deb` / `.rpm` |
 | Windows      | `Clipboard History_x.y.z_x64-setup.exe` or the `.msi` (Backend not ready yet) |
-| macOS        | `_aarch64.dmg` (Apple Silicon) or `_x64.dmg` (Intel) (Backend not ready yet) |
+| macOS        | `_aarch64.dmg` (Apple Silicon) or `_x64.dmg` (Intel) (**beta**: unsigned and not yet tested on a real Mac; open it via System Settings → Privacy & Security) |
 
 ## Updates
 
@@ -25,7 +25,7 @@ The app checks GitHub Releases for a newer version on launch and once a day; tha
 
 Works (automated tests pass): clipboard watching on GNOME X11 and on GNOME Wayland through XWayland, encrypted history (SQLite plus key in the keyring), popup with search, pin, delete and clear, Super+V shortcut (optionally taken from GNOME and restorable from the tray), paste-back on X11, copy-only on Wayland.
 
-Pending: the manual desktop checklist on real GNOME X11 and Wayland sessions (`.claude/skills/desktop-test/SKILL.md`), the real-login confirmation in `docs/adr/0001-gnome-wayland-clipboard-via-xwayland.md`, and the next plans (settings UI, KDE/Sway, macOS, Windows). Run it with `pnpm tauri dev`.
+Pending: the manual desktop checklist on real GNOME X11 and Wayland sessions (`.claude/skills/desktop-test/SKILL.md`), the real-login confirmation in `docs/adr/0001-gnome-wayland-clipboard-via-xwayland.md`, and the next plans (settings UI, KDE/Sway, Windows), and the macOS beta checklist in the same skill. Run it with `pnpm tauri dev`.
 
 ## Development
 

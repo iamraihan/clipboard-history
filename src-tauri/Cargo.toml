@@ -56,6 +56,13 @@ x11rb = { version = "0.14.0", features = ["xfixes", "xtest"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3.6.3", features = ["apple-native"] }
+# macOS Backend (platform/macos/): safe bindings to NSPasteboard, NSWorkspace
+# and CGEvent, so `unsafe_code` stays forbidden. All four are already in the
+# tree through tao; these lines only name the features we call.
+objc2 = { version = "0.6.5", default-features = false, features = ["std"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSString", "NSData", "NSArray", "NSEnumerator", "NSProcessInfo"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSPasteboard", "NSPasteboardItem", "NSWorkspace", "NSRunningApplication", "libc"] }
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGEvent", "CGEventTypes", "CGRemoteOperation"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3.6.3", features = ["windows-native"] }
